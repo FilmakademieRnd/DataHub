@@ -16,9 +16,9 @@ intent and gross negligence; warranty is limited to malice. DataHub may under
 no circumstances be used for racist, sexual or any illegal purposes. In all
 non-commercial productions, scientific publications, prototypical non-commercial
 software tools, etc. using the DataHub Filmakademie has to be named as follows:
-“TRACER - Toolset for Realtime Animation, Collaboration & Extended Reality by
-Filmakademie Baden-Württemberg, Animationsinstitut
-(http://research.animationsinstitut.de)“.
+"TRACER - Toolset for Realtime Animation, Collaboration & Extended Reality by
+Filmakademie Baden-Wuerttemberg, Animationsinstitut
+(http://research.animationsinstitut.de)".
 
 In case a company or individual would like to use DataHub in a commercial
 surrounding or for commercial purposes, software based on these components or
