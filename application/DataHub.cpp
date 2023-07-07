@@ -34,13 +34,18 @@ any part thereof, the company/individual will have to contact Filmakademie
 //! @date 03.07.2023
 
 #include <QtCore>
-#include <iostream>
+#include <QDebug>
 
 using namespace std;
 
 int main(int argc, char** argv)
 {
-	cout << "Hello world!" << endl;
+	QCoreApplication a(argc, argv);
+	QStringList cmdlineArgs = QCoreApplication::arguments();
 
-	return 0;
+	// search for plugins
+	QDir pluginsDir(QCoreApplication::applicationDirPath());
+	qDebug() << pluginsDir;
+
+	return a.exec();
 }

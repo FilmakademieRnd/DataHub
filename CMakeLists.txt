@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.16...3.22)
 
 project(DataHub VERSION 1.0.0 LANGUAGES CXX)
 
@@ -22,6 +22,22 @@ add_subdirectory(plugins)
 add_subdirectory(application)
 
 install(TARGETS ${i_targets}
-		RUNTIME 
-		DESTINATION ${INSTALL_DIR})
+		DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+)
+
+install(TARGETS $ENV{i_plugin_targets} 
+		DESTINATION ${CMAKE_INSTALL_PREFIX}/bin/plugins
+)
+
+qt_generate_deploy_app_script(
+    TARGET DataHub
+    FILENAME_VARIABLE deploy_script
+    NO_UNSUPPORTED_PLATFORM_ERROR
+#	NO_TRANSLATIONS
+)
+install(SCRIPT ${deploy_script}
+	DESTINATION ${CMAKE_INSTALL_PREFIX}
+)
+
+
 
