@@ -44,7 +44,7 @@ namespace DataHub {
         ZeroMQHandler* zeroMQHandler = new ZeroMQHandler(m_ownIP, m_debug, m_context);
         
         zeroMQHandler->moveToThread(zeroMQHandlerThread);
-        connect(zeroMQHandlerThread, SIGNAL(started()), zeroMQHandler, SLOT(run()));
+        QObject::connect(zeroMQHandlerThread, SIGNAL(started()), zeroMQHandler, SLOT(run()));
         
         zeroMQHandlerThread->start();
         zeroMQHandler->requestStart();

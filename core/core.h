@@ -41,12 +41,12 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 namespace DataHub {
 
-	class PLUGININTERFACESHARED_EXPORT core : public QObject, public PluginInterface
+	class PLUGININTERFACESHARED_EXPORT Core : public PluginInterface
 	{
-		Q_OBJECT
-
+		Q_PLUGIN_METADATA(IID "de.datahub.PluginInterface" FILE "metadata.json")
+		Q_INTERFACES(DataHub::PluginInterface)
 	public:
-		core();
+		Core();
 	private:
 		int m_test;
 	};

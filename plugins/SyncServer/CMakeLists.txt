@@ -22,8 +22,8 @@ target_link_directories(${target_name}
 target_compile_definitions(${target_name} PRIVATE PLUGININTERFACE_LIBRARY)
 
 target_link_libraries(${target_name} PRIVATE 
-	Qt6::Core 
-	Core 
+	Core
+	Qt6::Core
 	libzmq-v142-mt-4_3_5
 )
 

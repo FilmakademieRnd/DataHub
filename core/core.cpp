@@ -37,7 +37,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 namespace DataHub {
 
-	core::core() { m_test = 1; }
+	Core::Core() { m_test = 1; }
 
 }
 

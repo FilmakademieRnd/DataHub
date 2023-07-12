@@ -35,17 +35,50 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include <QtCore>
 #include <QDebug>
+#include <QPluginLoader>
+#include <QMultiMap>
+#include "plugininterface.h"
 
 using namespace std;
+using namespace DataHub;
+
+static QMultiMap<QString, PluginInterface*> plugins;
+
+static void loadPlugins()
+{
+	// search for plugins
+	QDir pluginsDir(QDir::currentPath() + "/plugins");
+    pluginsDir.setNameFilters(QStringList() << "*.dll");
+
+    const QStringList entries = pluginsDir.entryList();
+    
+    for (const QString& fileName : entries) {
+        QString filePath = pluginsDir.absoluteFilePath(fileName);
+        QPluginLoader pluginLoader(filePath);
+        QObject* plugin = pluginLoader.instance();
+        if (plugin) {
+            PluginInterface* pluginInterface = qobject_cast<PluginInterface*>(plugin);
+            if (pluginInterface)
+            {
+                plugins.insert("dasdas", pluginInterface);
+                // init plugin
+                qDebug() << "Plugin " + filePath + " loaded.";
+            }
+            else
+                pluginLoader.unload();
+        }
+        else
+            qDebug() << "Plugin " + filePath + " could not be loaded.";
+    }
+
+}
 
 int main(int argc, char** argv)
 {
 	QCoreApplication a(argc, argv);
 	QStringList cmdlineArgs = QCoreApplication::arguments();
 
-	// search for plugins
-	QDir pluginsDir(QCoreApplication::applicationDirPath());
-	qDebug() << pluginsDir;
+	loadPlugins();
 
 	return a.exec();
 }

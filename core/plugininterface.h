@@ -40,6 +40,14 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include <QString>
 #include <QtCore/qglobal.h>
 
+
+////!
+////! Qt plugin system
+////!
+//#ifndef Q_PLUGIN_METADATA
+//#define Q_PLUGIN_METADATA(x)
+//#endif
+
 #if defined(PLUGININTERFACE_LIBRARY)
 #define PLUGININTERFACESHARED_EXPORT Q_DECL_EXPORT
 #else
@@ -51,8 +59,12 @@ namespace DataHub
 	//!
 	//! \brief Interface for plugins for the DataHub
 	//!
-	class PLUGININTERFACESHARED_EXPORT PluginInterface
+	class PLUGININTERFACESHARED_EXPORT PluginInterface 
 	{
+		
+	
+	public:
+		//QString name() { return metaObject()->className(); }
 	};
 
 
