@@ -37,12 +37,26 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include <QDebug>
 #include <QPluginLoader>
 #include <QMultiMap>
+#include <cstdlib>
+#include <csignal>
 #include "plugininterface.h"
 
 using namespace std;
 using namespace DataHub;
 
-static QMultiMap<QString, PluginInterface*> plugins;
+static QMultiMap<QString, PluginInterface*> s_plugins;
+
+void onQuit(int signal)
+{
+    qDebug() << "Exiting all Threads...";
+
+    foreach (PluginInterface *plugin, s_plugins)
+    {
+        plugin->stop();
+    }
+
+    exit(0);
+}
 
 static void loadPlugins()
 {
@@ -60,9 +74,11 @@ static void loadPlugins()
             PluginInterface* pluginInterface = qobject_cast<PluginInterface*>(plugin);
             if (pluginInterface)
             {
-                plugins.insert("dasdas", pluginInterface);
+                s_plugins.insert(pluginInterface->name(), pluginInterface);
                 // init plugin
                 qDebug() << "Plugin " + filePath + " loaded.";
+
+                pluginInterface->run();
             }
             else
                 pluginLoader.unload();
@@ -75,8 +91,17 @@ static void loadPlugins()
 
 int main(int argc, char** argv)
 {
-	QCoreApplication a(argc, argv);
+    QCoreApplication a(argc, argv);
 	QStringList cmdlineArgs = QCoreApplication::arguments();
+
+    //^C
+    signal(SIGINT, onQuit);
+    //abort()
+    signal(SIGABRT, onQuit);
+    //sent by "kill" command
+    signal(SIGTERM, onQuit);
+    //^Z
+    signal(SIGABRT_COMPAT, onQuit);
 
 	loadPlugins();
 

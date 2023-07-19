@@ -10,7 +10,7 @@ set(CMAKE_DEBUG_POSTFIX _d)
 
 set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH "set install prefix" FORCE)
 
-find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core Network)
 qt_standard_project_setup()
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON) 
@@ -30,7 +30,7 @@ install(TARGETS $ENV{i_plugin_targets}
 )
 
 qt_generate_deploy_app_script(
-    TARGET DataHub
+    TARGET SyncServer
     FILENAME_VARIABLE deploy_script
     NO_UNSUPPORTED_PLATFORM_ERROR
 #	NO_TRANSLATIONS

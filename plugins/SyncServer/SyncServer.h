@@ -44,23 +44,29 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 namespace DataHub {
 
-	class PLUGININTERFACESHARED_EXPORT SyncServer : public QObject, public PluginInterface
+	class PLUGININTERFACESHARED_EXPORT SyncServer : public PluginInterface
 	{
 		Q_OBJECT
 		Q_PLUGIN_METADATA(IID "de.datahub.PluginInterface" FILE "metadata.json")
 		Q_INTERFACES(DataHub::PluginInterface)
 
 	public:
-		//SyncServer() : QObject(), m_ownIP(""), m_debug(false), m_context(new zmq::context_t(1)) { }
-		//SyncServer(QString ownIP, bool debug) : QObject((QObject *) nullptr), m_ownIP(ownIP), m_debug(debug), m_context(new zmq::context_t(1)) { }
+		SyncServer() : m_ownIP(""), m_debug(false), m_context(new zmq::context_t(1)) { }
 	
 	public:
-		void run();
+		virtual void run();
+		virtual void stop();
 
 	private:
-		QString m_ownIP;
+		QString m_ownIP = "";
 		zmq::context_t *m_context;
 		bool m_debug;
+		QThread* m_zeroMQHandlerThread;
+		ZeroMQHandler* m_zeroMQHandler;
+
+	private:
+		void InitServer();
+		void printHelp();
 
 	};
 
