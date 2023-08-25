@@ -34,10 +34,75 @@ any part thereof, the company/individual will have to contact Filmakademie
 //! @date 03.07.2023
 
 #include "core.h"
+#include <QPluginLoader>
+#include <cstdlib>
 
 namespace DataHub {
 
-	Core::Core() { m_test = 1; }
+	Core::Core() 
+	{
+        m_timesteps = (int)((s_timestepsBase / s_framerate) * s_framerate);
+
+        TimerThread tthread(1000.f/m_timesteps);
+        connect(&tthread, SIGNAL(tick()), this, SLOT(updateTime()), Qt::DirectConnection);
+        tthread.start();
+        tthread.setPriority(QThread::HighPriority);
+
+		loadPlugins();
+	}
+
+    Core::~Core()
+    {
+        qDebug() << "Exiting all Threads...";
+
+        foreach(PluginInterface * plugin, s_plugins)
+        {
+            plugin->stop();
+        }
+    }
+
+	//!
+    //! Function for increasing and resetting the time variable.
+    //!
+	void Core::updateTime()
+	{
+		m_time = (m_time > (m_timesteps - 2) ? (char)0 : m_time += 1);
+
+        if ((m_time % s_framerate) == 0) 
+            emit tickSecond(m_time);
+	}
+
+    void Core::loadPlugins()
+    {
+        // search for plugins
+        QDir pluginsDir(QDir::currentPath() + "/plugins");
+        pluginsDir.setNameFilters(QStringList() << "*.dll");
+
+        const QStringList entries = pluginsDir.entryList();
+
+        for (const QString& fileName : entries) {
+            QString filePath = pluginsDir.absoluteFilePath(fileName);
+            QPluginLoader pluginLoader(filePath);
+            QObject* plugin = pluginLoader.instance();
+            if (plugin) {
+                PluginInterface* pluginInterface = qobject_cast<PluginInterface*>(plugin);
+                if (pluginInterface)
+                {
+                    s_plugins.insert(pluginInterface->name(), pluginInterface);
+                    // init plugin
+                    qDebug() << "Plugin " + filePath + " loaded.";
+                    pluginInterface->setCore(this);
+                    pluginInterface->init();
+                    pluginInterface->run();
+                }
+                else
+                    pluginLoader.unload();
+            }
+            else
+                qDebug() << "Plugin " + filePath + " could not be loaded.";
+        }
+
+    }
 
 }
 

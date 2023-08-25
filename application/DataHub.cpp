@@ -35,75 +35,20 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include <QtCore>
 #include <QDebug>
-#include <QPluginLoader>
-#include <QMultiMap>
-#include <cstdlib>
 #include <csignal>
-#include "plugininterface.h"
+#include "core.h"
 
 using namespace std;
 using namespace DataHub;
 
-static QMultiMap<QString, PluginInterface*> s_plugins;
-
-void onQuit(int signal)
-{
-    qDebug() << "Exiting all Threads...";
-
-    foreach (PluginInterface *plugin, s_plugins)
-    {
-        plugin->stop();
-    }
-
-    exit(0);
-}
-
-static void loadPlugins()
-{
-	// search for plugins
-	QDir pluginsDir(QDir::currentPath() + "/plugins");
-    pluginsDir.setNameFilters(QStringList() << "*.dll");
-
-    const QStringList entries = pluginsDir.entryList();
-    
-    for (const QString& fileName : entries) {
-        QString filePath = pluginsDir.absoluteFilePath(fileName);
-        QPluginLoader pluginLoader(filePath);
-        QObject* plugin = pluginLoader.instance();
-        if (plugin) {
-            PluginInterface* pluginInterface = qobject_cast<PluginInterface*>(plugin);
-            if (pluginInterface)
-            {
-                s_plugins.insert(pluginInterface->name(), pluginInterface);
-                // init plugin
-                qDebug() << "Plugin " + filePath + " loaded.";
-
-                pluginInterface->run();
-            }
-            else
-                pluginLoader.unload();
-        }
-        else
-            qDebug() << "Plugin " + filePath + " could not be loaded.";
-    }
-
-}
 
 int main(int argc, char** argv)
 {
     QCoreApplication a(argc, argv);
 	QStringList cmdlineArgs = QCoreApplication::arguments();
 
-    //^C
-    signal(SIGINT, onQuit);
-    //abort()
-    signal(SIGABRT, onQuit);
-    //sent by "kill" command
-    signal(SIGTERM, onQuit);
-    //^Z
-    signal(SIGABRT_COMPAT, onQuit);
-
-	loadPlugins();
+	Core core;
+	int test = core.test;
 
 	return a.exec();
 }

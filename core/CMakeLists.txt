@@ -1,12 +1,11 @@
 set (target_name Core)
 
 qt_add_library(${target_name} SHARED
-    core.cpp
+	core.cpp
 	core.h
-	plugininterface.h
 )
 
-target_compile_definitions(${target_name} PRIVATE PLUGININTERFACE_LIBRARY)
+target_compile_definitions(${target_name} PRIVATE CORE_LIBRARY)
 
 target_link_libraries(${target_name} PRIVATE Qt6::Core)
 

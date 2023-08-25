@@ -40,24 +40,42 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include <QString>
 #include <QtCore/qglobal.h>
 
-
 #if defined(PLUGININTERFACE_LIBRARY)
 #define PLUGININTERFACESHARED_EXPORT Q_DECL_EXPORT
 #else
 #define PLUGININTERFACESHARED_EXPORT Q_DECL_IMPORT
 #endif
 
+#if defined(CORE_LIBRARY)
+#define CORESHARED_EXPORT Q_DECL_EXPORT
+#else
+#define CORESHARED_EXPORT Q_DECL_IMPORT
+#endif
+
+
 namespace DataHub
 {
+	// Forewar deleclaration of core class.
+	class Core;
+
 	//!
 	//! \brief Interface for plugins for the DataHub
 	//!
-	class PLUGININTERFACESHARED_EXPORT PluginInterface : public QObject
+	class CORESHARED_EXPORT PluginInterface : public QObject
 	{
 	public:
 		QString name() { return metaObject()->className(); }
 		virtual void run() = 0;
 		virtual void stop() = 0;
+	private:
+		Core* m_core = 0;
+	public:
+		virtual void init() {};
+		void setCore(Core* core) { m_core = core; };
+	public:
+		Core* core() const { return m_core; };
+
+		friend class Core;
 	};
 
 

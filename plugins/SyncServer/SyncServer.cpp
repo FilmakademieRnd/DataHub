@@ -37,8 +37,20 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include <QtNetwork/QNetworkInterface>
 #include <QtNetwork/QHostAddress>
 #include <iostream>
+#include "core.h"
+
 
 namespace DataHub {
+
+    void SyncServer::init()
+    {
+       connect(core(), SIGNAL(tickSecond(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
+    }
+
+    void SyncServer::createSyncMessage(int time)
+    {
+        qInfo() << time;  //todo
+    }
 
 	void SyncServer::run()
 	{
@@ -117,11 +129,12 @@ namespace DataHub {
     void SyncServer::InitServer()
     {
         //create Thread to receive zeroMQ messages from tablets
-        m_zeroMQHandlerThread = new QThread();
+       
         m_zeroMQHandler = new ZeroMQHandler(m_ownIP, m_debug, m_context);
+        m_zeroMQHandlerThread = new QThread();
 
         m_zeroMQHandler->moveToThread(m_zeroMQHandlerThread);
-        QObject::connect(m_zeroMQHandlerThread, SIGNAL(started()), m_zeroMQHandler, SLOT(run()));
+        QObject::connect(m_zeroMQHandlerThread, &QThread::started, m_zeroMQHandler, &ZeroMQHandler::run);
 
         m_zeroMQHandlerThread->start();
         m_zeroMQHandler->requestStart();

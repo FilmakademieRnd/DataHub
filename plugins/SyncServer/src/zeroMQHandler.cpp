@@ -53,7 +53,7 @@ void ZeroMQHandler::requestStart()
     mutex.lock();
     _working = true;
     _stop = false;
-    qDebug()<<"ZeroMQHandler requested to start";// in Thread "<<thread()->currentThreadId();
+    qInfo() << "ZeroMQHandler requested to start"; // in Thread "<<thread()->currentThreadId();
     mutex.unlock();
 
     emit startRequested();
@@ -64,7 +64,7 @@ void ZeroMQHandler::requestStop()
     mutex.lock();
     if (_working) {
         _stop = true;
-        qDebug()<<"ZeroMQHandler stopping";// in Thread "<<thread()->currentThreadId();
+        qInfo() << "ZeroMQHandler stopping"; // in Thread "<<thread()->currentThreadId();
     }
     mutex.unlock();
 }
@@ -76,14 +76,17 @@ short ZeroMQHandler::CharToShort(const char* buf)
   return val;
 }
 
+void ZeroMQHandler::createSyncMessage()
+{
+    //syncMessage = { 255,  ,  };
+
+}
+
 void ZeroMQHandler::run()
 {
-
     socket_ = new zmq::socket_t(*context_,ZMQ_SUB);
     socket_->bind(QString("tcp://"+IPadress+":5557").toLatin1().data());
     socket_->setsockopt(ZMQ_SUBSCRIBE,"client",0);
-    socket_->setsockopt(ZMQ_SUBSCRIBE,"ncam",0);
-    socket_->setsockopt(ZMQ_SUBSCRIBE,"recorder",0);
 
     socketExternal_ = new zmq::socket_t(*context_,ZMQ_ROUTER);
     socketExternal_->setsockopt(ZMQ_ROUTER_RAW, 1);
@@ -139,6 +142,8 @@ void ZeroMQHandler::run()
                         std::cout << c;
                     }
                     std::cout << std::endl;
+
+                    free(rawDataExt);
                 }
             }
         }
@@ -146,17 +151,20 @@ void ZeroMQHandler::run()
         //check if recv timed out
         if(message.size() != 0)
         {
-            char* rawData = static_cast<char*>(malloc(message.size()*sizeof(char)));
+            char* rawData = static_cast<char*>(malloc(message.size()));
             memcpy(rawData, message.data(), message.size());
             QByteArray msgArray = QByteArray(rawData, static_cast<int>(message.size()));
+           
             if(msgIsExternal)
                 msgArray.remove(msgArray.length()-1,1);
 
             char clientID = rawData[0];
+            // char time = rawData[1];
             MessageType msgType = static_cast<MessageType>(rawData[2]);
-            short sceneObjectID = CharToShort(&rawData[3]);
-            short parameterID = CharToShort(&rawData[5]);
-            QByteArray msgKey = QByteArray(rawData+2, 5); //combination of ParamType & objectID
+            //char sceneID = rawData[3];
+            //short sceneObjectID = CharToShort(&rawData[4]);
+            //short parameterID = CharToShort(&rawData[6]);
+            QByteArray msgKey = QByteArray(rawData+2, 4); //combination of ParamType & objectID
 
             if(_debug)
             {
@@ -166,8 +174,9 @@ void ZeroMQHandler::run()
                 std::cout << "mtype: " << static_cast<MessageType>(rawData[2]) << " "; //MessageType
                 if(msgType ==  PARAMETERUPDATE)
                 {
-                    std::cout << "oID: " <<  CharToShort(&rawData[3]) << " "; //SceneObjectID
-                    std::cout << "pID: " << CharToShort(&rawData[5]); //ParamID
+                    std::cout << "sID: " <<  rawData[3] << " "; //SceneID
+                    std::cout << "oID: " <<  CharToShort(&rawData[4]) << " "; //SceneObjectID
+                    std::cout << "pID: " << CharToShort(&rawData[6]); //ParamID
                 }
                 std::cout << std::endl;
             }
@@ -206,31 +215,26 @@ void ZeroMQHandler::run()
             }
             else if (msgType == LOCK){
                 //store locked object for each client
-                lockMap.insert(clientID,sceneObjectID);
+                lockMap.insert(clientID, EncodeIds( rawData[3] , rawData[4], rawData[5] ));
                 objectStateMap.insert(msgKey, msgArray.replace((qsizetype)0,(qsizetype)1,&targetHostID,(qsizetype) 1));
                 if(_debug)
                 {
                     std::cout << "LockMsg: ";
+                    std::cout << "LockMsg: ";
                     std::cout << "cID: " << 256+rawData[0] << " "; //ClientID
-                    std::cout << "t: " << 0+rawData[1] << " "; //Time
-                    std::cout << "oID: " <<  CharToShort(&rawData[3]); //SceneObjectID
-                    std::cout << "state: " <<  0+rawData[5]; //SceneObjectID
+                    std::cout << "t: " << rawData[1] << " "; //Time
+                    std::cout << "sID: " <<  rawData[3]; //SceneObjectID
+                    std::cout << "oID: " <<  CharToShort(&rawData[4]); //SceneObjectID
+                    std::cout << "state: " <<  rawData[6]; //SceneObjectID
                     std::cout << std::endl;
                 }
                 sender_->send(message);
             }
-            /*else if (msgType == CHARACTERTARGET)
-            {
-                //send to all zerMQ clients (most relevant for the scene server)
-                sender_->send(message);
-                //send to animation engine over TCP
-                 socketExternal_->send(message);
-            }*/
             else if (msgType != PING){
-                //if(msgType != HIDDENLOCK)
                 objectStateMap.insert(msgKey, msgArray.replace((qsizetype)0,(qsizetype)1,&targetHostID,(qsizetype)1));
                 sender_->send(message);
             }
+            free(rawData);
         }
 
         //check if ping timed out for any client
@@ -245,29 +249,22 @@ void ZeroMQHandler::run()
                 if(lockMap.contains(clientID))
                 {
                     //release lock
-                    char* lockReleaseMsg = static_cast<char*>(malloc(7*sizeof(char)));
-                    *lockReleaseMsg = 0;
-                    lockReleaseMsg++;
-                    *lockReleaseMsg = static_cast<char>(LOCK);
-                    lockReleaseMsg++;
-                    void* intPtr = (char*) &lockMap[clientID];
-                    memcpy(lockReleaseMsg,intPtr,sizeof(int));
-                    lockReleaseMsg+=4;
-                    *lockReleaseMsg = static_cast<char>(false);
+                    char lockReleaseMsg[7];
+                    byte* rawDataPtr = DecodeIds(lockMap[clientID]);
+                    lockReleaseMsg[0] = static_cast<char>(0);
+                    lockReleaseMsg[1] = static_cast<char>(0);  // time
+                    lockReleaseMsg[2] = static_cast<char>(LOCK);
+                    lockReleaseMsg[3] = *rawDataPtr;
+                    memcpy(lockReleaseMsg+4, rawDataPtr+1, sizeof(short));
+                    lockReleaseMsg[6] = static_cast<char>(false);
                     std::cout << "Resetting lock!";
-                    lockReleaseMsg-=6;
                     QByteArray msgArray = QByteArray(lockReleaseMsg, 7);
-                    QByteArray msgKey = QByteArray(lockReleaseMsg+1, 5);
+                    QByteArray msgKey = QByteArray(lockReleaseMsg+2, 4);
 
                     objectStateMap.insert(msgKey, msgArray);
                     sender_->send(msgArray.constData(), static_cast<size_t>(msgArray.length()));
 
                     lockMap.remove(clientID);
-
-                    if (lockReleaseMsg) {
-                        delete lockReleaseMsg;
-                        lockReleaseMsg = 0;
-                    }
                 }
             }
         }

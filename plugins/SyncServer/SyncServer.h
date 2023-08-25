@@ -43,7 +43,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 
 namespace DataHub {
-
+	
 	class PLUGININTERFACESHARED_EXPORT SyncServer : public PluginInterface
 	{
 		Q_OBJECT
@@ -59,15 +59,17 @@ namespace DataHub {
 
 	private:
 		QString m_ownIP = "";
-		zmq::context_t *m_context;
 		bool m_debug;
+		zmq::context_t *m_context;
 		QThread* m_zeroMQHandlerThread;
 		ZeroMQHandler* m_zeroMQHandler;
-
+	protected:
+		void init();
 	private:
 		void InitServer();
 		void printHelp();
-
+	private slots:
+		void createSyncMessage(int);
 	};
 
 }

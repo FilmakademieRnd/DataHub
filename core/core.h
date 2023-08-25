@@ -37,18 +37,65 @@ any part thereof, the company/individual will have to contact Filmakademie
 #define CORE_H
 
 #include "plugininterface.h"
+#include <QtCore>
+#include <QMultiMap>
 
 
 namespace DataHub {
 
-	class PLUGININTERFACESHARED_EXPORT Core : public PluginInterface
+	class CORESHARED_EXPORT TimerThread : public QThread
 	{
-		Q_PLUGIN_METADATA(IID "de.datahub.PluginInterface" FILE "metadata.json")
-		Q_INTERFACES(DataHub::PluginInterface)
+		Q_OBJECT
+
+		void run()
+		{
+			QTimer timer;
+			connect(&timer, SIGNAL(timeout()), this, SIGNAL(tick()), Qt::DirectConnection);
+			timer.setTimerType(Qt::PreciseTimer);
+			timer.start(m_interval);
+			timer.moveToThread(this);
+			exec();
+		}
+
+	public:
+		TimerThread() : m_interval(1000) {}
+		TimerThread(int interval) : m_interval(interval) {}
+
+	private:
+		int m_interval;
+
+	signals:
+		void tick();
+
+	};
+
+	class CORESHARED_EXPORT Core : public QObject
+	{
+		Q_OBJECT
+
 	public:
 		Core();
+		~Core();
+		int test = 3;
 	private:
-		int m_test;
+		QMultiMap<QString, PluginInterface*> s_plugins;
+		QTimer* m_timer;
+		QThread* m_TimerThread;
+
+		unsigned char m_time = 0;
+		unsigned char m_timesteps = 0;
+		static const int s_framerate = 60;
+		static const int s_timestepsBase = 128;
+
+	private:
+		void loadPlugins();
+
+	private slots:
+		void updateTime();
+
+	signals:
+		void tickSecond(int time);
+        
 	};
 
 }

@@ -57,7 +57,8 @@ public:
     {
         PARAMETERUPDATE, LOCK, // node
         SYNC, PING, RESENDUPDATE, // sync
-        UNDOREDOADD, RESETOBJECT // undo redo
+        UNDOREDOADD, RESETOBJECT, // undo redo
+        DATAHUB // DataHub
     };
 
     short CharToShort(const char* buf);
@@ -87,6 +88,9 @@ private:
     //zeroMQ context
     zmq::context_t* context_;
 
+    //syncMessage
+    char syncMessage[3];
+
     //server IP
     QString IPadress;
 
@@ -97,7 +101,7 @@ private:
     QMap<char, QElapsedTimer*> pingMap;
 
     //map of last states
-    QMap<char, int> lockMap;
+    QMap<byte, int> lockMap;
 
 signals:
     //signal emitted when process requests to work
@@ -107,8 +111,36 @@ signals:
     void stopped();
 
 public slots:
+    //create a new sync message
+    void createSyncMessage();
     //execute operations
     void run();
+
+private:
+	//! 
+	//! Encodes a selectable id into a color.
+	//!
+	inline int EncodeIds(byte a, byte b, byte c)
+	{
+        return static_cast<int>(
+            static_cast<byte> (0) << 24 |
+            static_cast<byte> (a) << 16 |
+            static_cast<byte> (b) << 8 |
+            static_cast<byte> (c) );
+	}
+
+    //! 
+    //! Decodes a color into a selectable id.
+    //!
+    inline byte(&DecodeIds(int in))[3]
+    {
+        byte r[] = {
+            static_cast<byte> (in >> 16),
+            static_cast<byte> (in >> 8),
+            static_cast<byte> (in) };
+        
+        return r; 
+    }
 };
 
 #endif // ZEROMQHANDLER_H
