@@ -37,15 +37,16 @@ will have to contact Filmakademie (research<at>filmakademie.de).
 
 #include <QObject>
 #include <QMutex>
-#include <QMap>
+#include <QMultiMap>
 #include <QElapsedTimer>
 #include <nzmqt/nzmqt.hpp>
+#include "core.h"
 
 class ZeroMQHandler : public QObject
 {
     Q_OBJECT
 public:
-    explicit ZeroMQHandler(QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
+    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
 
     //request this process to start working
     void requestStart();
@@ -58,15 +59,15 @@ public:
         PARAMETERUPDATE, LOCK, // node
         SYNC, PING, RESENDUPDATE, // sync
         UNDOREDOADD, RESETOBJECT, // undo redo
-        DATAHUB // DataHub
+        DATAHUB, // DataHub
+        EMPTY = 255
     };
 
-    short CharToShort(const char* buf);
-
 private:
+    DataHub::Core* _core;
 
     //id displayed as clientID for messages redistributed through syncServer
-    char targetHostID = 1;
+    byte targetHostID = 0;
 
     //if true process is stopped
     bool _stop;
@@ -82,14 +83,13 @@ private:
 
     //zeroMQ socket
     zmq::socket_t* socket_;
-    zmq::socket_t* socketExternal_;
     zmq::socket_t* sender_;
 
     //zeroMQ context
     zmq::context_t* context_;
 
     //syncMessage
-    char syncMessage[3];
+    byte syncMessage[3] = {targetHostID,0,MessageType::EMPTY};
 
     //server IP
     QString IPadress;
@@ -98,10 +98,22 @@ private:
     QMap<QByteArray, QByteArray> objectStateMap;
 
     //map of ping timings
-    QMap<char, QElapsedTimer*> pingMap;
+    QMap<byte, unsigned int> pingMap;
 
     //map of last states
-    QMap<byte, int> lockMap;
+    QMultiMap<byte, QByteArray> lockMap;
+
+    //the local elapsed time in seconds since object has been created.
+    unsigned int m_time = 0;
+
+    static const unsigned int m_pingTimeout = 4;
+    
+    inline const short CharToShort(const char* buf) const 
+    {
+        short val;
+        std::memcpy(&val, buf, 2);
+        return val;
+    }
 
 signals:
     //signal emitted when process requests to work
@@ -110,37 +122,13 @@ signals:
     //signal emitted when process is finished
     void stopped();
 
-public slots:
-    //create a new sync message
-    void createSyncMessage();
+public slots:    
     //execute operations
     void run();
 
-private:
-	//! 
-	//! Encodes a selectable id into a color.
-	//!
-	inline int EncodeIds(byte a, byte b, byte c)
-	{
-        return static_cast<int>(
-            static_cast<byte> (0) << 24 |
-            static_cast<byte> (a) << 16 |
-            static_cast<byte> (b) << 8 |
-            static_cast<byte> (c) );
-	}
-
-    //! 
-    //! Decodes a color into a selectable id.
-    //!
-    inline byte(&DecodeIds(int in))[3]
-    {
-        byte r[] = {
-            static_cast<byte> (in >> 16),
-            static_cast<byte> (in >> 8),
-            static_cast<byte> (in) };
-        
-        return r; 
-    }
+private slots:
+    //create a new sync message
+    void createSyncMessage(int time);
 };
 
 #endif // ZEROMQHANDLER_H

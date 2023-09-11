@@ -76,13 +76,13 @@ namespace DataHub {
 	public:
 		Core();
 		~Core();
-		int test = 3;
+	public:
+		unsigned char m_time = 0;
 	private:
 		QMultiMap<QString, PluginInterface*> s_plugins;
 		QTimer* m_timer;
 		QThread* m_TimerThread;
 
-		unsigned char m_time = 0;
 		unsigned char m_timesteps = 0;
 		static const int s_framerate = 60;
 		static const int s_timestepsBase = 128;

@@ -51,14 +51,14 @@ namespace DataHub {
 		Q_INTERFACES(DataHub::PluginInterface)
 
 	public:
-		SyncServer() : m_ownIP(""), m_debug(false), m_context(new zmq::context_t(1)) { }
+		SyncServer() : m_ownIP(""), m_debug(false), m_context(new zmq::context_t(1)), m_zeroMQHandler(0), m_zeroMQHandlerThread(0) { }
 	
 	public:
 		virtual void run();
 		virtual void stop();
 
 	private:
-		QString m_ownIP = "";
+		QString m_ownIP;
 		bool m_debug;
 		zmq::context_t *m_context;
 		QThread* m_zeroMQHandlerThread;
@@ -68,8 +68,6 @@ namespace DataHub {
 	private:
 		void InitServer();
 		void printHelp();
-	private slots:
-		void createSyncMessage(int);
 	};
 
 }

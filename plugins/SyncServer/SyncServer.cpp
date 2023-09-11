@@ -44,12 +44,7 @@ namespace DataHub {
 
     void SyncServer::init()
     {
-       connect(core(), SIGNAL(tickSecond(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
-    }
-
-    void SyncServer::createSyncMessage(int time)
-    {
-        qInfo() << time;  //todo
+        // fill me!
     }
 
 	void SyncServer::run()
@@ -130,7 +125,7 @@ namespace DataHub {
     {
         //create Thread to receive zeroMQ messages from tablets
        
-        m_zeroMQHandler = new ZeroMQHandler(m_ownIP, m_debug, m_context);
+        m_zeroMQHandler = new ZeroMQHandler(core(), m_ownIP, m_debug, m_context);
         m_zeroMQHandlerThread = new QThread();
 
         m_zeroMQHandler->moveToThread(m_zeroMQHandlerThread);

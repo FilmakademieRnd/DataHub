@@ -43,7 +43,8 @@ namespace DataHub {
 	{
         m_timesteps = (int)((s_timestepsBase / s_framerate) * s_framerate);
 
-        TimerThread tthread(1000.f/m_timesteps);
+        TimerThread tthread(1000.f/s_framerate);
+
         connect(&tthread, SIGNAL(tick()), this, SLOT(updateTime()), Qt::DirectConnection);
         tthread.start();
         tthread.setPriority(QThread::HighPriority);
@@ -66,7 +67,7 @@ namespace DataHub {
     //!
 	void Core::updateTime()
 	{
-		m_time = (m_time > (m_timesteps - 2) ? (char)0 : m_time += 1);
+		m_time = (m_time > (m_timesteps - 2) ? (unsigned char)0 : m_time += 1);
 
         if ((m_time % s_framerate) == 0) 
             emit tickSecond(m_time);

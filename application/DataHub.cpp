@@ -48,7 +48,6 @@ int main(int argc, char** argv)
 	QStringList cmdlineArgs = QCoreApplication::arguments();
 
 	Core core;
-	int test = core.test;
 
 	return a.exec();
 }
