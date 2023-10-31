@@ -123,16 +123,27 @@ namespace DataHub {
 
     void SyncServer::InitServer()
     {
-        //create Thread to receive zeroMQ messages from tablets
+        //create thread to receive zeroMQ messages from clients
        
         m_zeroMQHandler = new ZeroMQHandler(core(), m_ownIP, m_debug, m_context);
-        m_zeroMQHandlerThread = new QThread();
+        m_zeroMQHandlerThread = new QThread(this);
 
         m_zeroMQHandler->moveToThread(m_zeroMQHandlerThread);
         QObject::connect(m_zeroMQHandlerThread, &QThread::started, m_zeroMQHandler, &ZeroMQHandler::run);
 
         m_zeroMQHandlerThread->start();
         m_zeroMQHandler->requestStart();
+
+        //create thread to receive command messages from clients
+
+        m_commandHandler = new CommandHandler(core(), m_ownIP, m_debug, m_context);
+        m_commandHandlerThread = new QThread(this);
+
+        m_commandHandler->moveToThread(m_commandHandlerThread);
+        QObject::connect(m_commandHandlerThread, &QThread::started, m_commandHandler, &CommandHandler::run);
+
+        m_commandHandlerThread->start();
+        m_commandHandler->requestStart();
     }
 
     void SyncServer::printHelp()

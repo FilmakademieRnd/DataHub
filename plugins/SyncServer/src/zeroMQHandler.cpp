@@ -39,44 +39,85 @@ will have to contact Filmakademie (research<at>filmakademie.de).
 #include <QDebug>
 #include <iostream>
 
-ZeroMQHandler::ZeroMQHandler(DataHub::Core* core, QString ip, bool debug, zmq::context_t* context)
+ThreadBase::ThreadBase(DataHub::Core* core) : m_core(core)
 {
-	IPadress = ip;
-	context_ = context;
-	_debug = debug;
-	_stop = false;
-	_working = false;
-	_core = core;
+	m_stop = false;
+	m_working = false;
+}
+
+void ThreadBase::requestStart()
+{
+	m_mutex.lock();
+	m_working = true;
+	m_stop = false;
+	qInfo() << "ZeroMQHandler requested to start"; // in Thread "<<thread()->currentThreadId();
+	m_mutex.unlock();
+}
+
+void ThreadBase::requestStop()
+{
+	m_mutex.lock();
+	if (m_working) {
+		m_stop = true;
+		qInfo() << "ZeroMQHandler stopping"; // in Thread "<<thread()->currentThreadId();
+	}
+	m_mutex.unlock();
+}
+
+ZeroMQPoller::ZeroMQPoller(DataHub::Core* core, zmq::pollitem_t* item, QWaitCondition* waitCondition) : ThreadBase(core), m_item(item), m_waitCondition(waitCondition)
+{
+}
+
+void ZeroMQPoller::run()
+{
+	while (true) {
+		// checks if process should be aborted
+		m_mutex.lock();
+		bool stop = m_stop;
+		m_mutex.unlock();
+
+		//try to receive a zeroMQ message
+		zmq::poll(m_item, 1, -1);
+
+		if (m_item->revents & ZMQ_POLLIN)
+			m_waitCondition->wakeOne();
+
+		if (stop) {
+			qDebug() << "Stopping ZeroMQPoller";// in Thread "<<thread()->currentThreadId();
+			break;
+		}
+
+		QThread::yieldCurrentThread();
+	}
+
+	// Set _working to false -> process cannot be aborted anymore
+	m_mutex.lock();
+	m_working = false;
+	m_mutex.unlock();
+
+	qDebug() << "ZeroMQHandler process stopped";// in Thread "<<thread()->currentThreadId();
+}
+
+ZeroMQHandler::ZeroMQHandler(DataHub::Core* core, QString ip, bool debug, zmq::context_t* context) : ThreadBase(core)
+{
+	m_IPadress = ip;
+	m_context = context;
+	m_debug = debug;
+	m_stop = false;
+	m_working = false;
 
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
 }
 
-void ZeroMQHandler::requestStart()
-{
-	mutex.lock();
-	_working = true;
-	_stop = false;
-	qInfo() << "ZeroMQHandler requested to start"; // in Thread "<<thread()->currentThreadId();
-	mutex.unlock();
-
-	emit startRequested();
-}
-
-void ZeroMQHandler::requestStop()
-{
-	mutex.lock();
-	if (_working) {
-		_stop = true;
-		qInfo() << "ZeroMQHandler stopping"; // in Thread "<<thread()->currentThreadId();
-	}
-	mutex.unlock();
-}
-
 void ZeroMQHandler::createSyncMessage(int time)
 {
-	syncMessage[0] = targetHostID;
-	syncMessage[1] = time;
-	syncMessage[2] = MessageType::SYNC;
+	m_mutex.lock();
+	m_syncMessage[0] = m_targetHostID;
+	m_syncMessage[1] = time;
+	m_syncMessage[2] = MessageType::SYNC;
+	m_mutex.unlock();
+
+	m_waitContition->wakeOne();
 
 	// increase local time for controlling client timeouts
 	m_time++;
@@ -84,37 +125,60 @@ void ZeroMQHandler::createSyncMessage(int time)
 
 void ZeroMQHandler::run()
 {
-	socket_ = new zmq::socket_t(*context_, ZMQ_SUB);
-	socket_->bind(QString("tcp://" + IPadress + ":5557").toLatin1().data());
-	socket_->setsockopt(ZMQ_SUBSCRIBE, "client", 0);
+	zmq::socket_t socket(*m_context, ZMQ_SUB);
+	socket.bind(QString("tcp://" + m_IPadress + ":5557").toLatin1().data());
+	socket.setsockopt(ZMQ_SUBSCRIBE, "client", 0);
 
-	sender_ = new zmq::socket_t(*context_, ZMQ_PUB);
-	sender_->bind(QString("tcp://" + IPadress + ":5556").toLatin1().data());
+	zmq::socket_t sender(*m_context, ZMQ_PUB);
+	sender.bind(QString("tcp://" + m_IPadress + ":5556").toLatin1().data());
 
-	zmq::pollitem_t item = { static_cast<void*>(*socket_), 0, ZMQ_POLLIN, 0 };
+	zmq::pollitem_t item = { static_cast<void*>(socket), 0, ZMQ_POLLIN, 0 };
+
+	m_waitContition = new QWaitCondition();
+	ZeroMQPoller zeroMQPoller(ZeroMQPoller(m_core, &item, m_waitContition));
+	
+	m_zeroMQPollerThread = new QThread(this);
+	zeroMQPoller.moveToThread(m_zeroMQPollerThread);
+
+	QObject::connect(m_zeroMQPollerThread, &QThread::started, &zeroMQPoller, &ZeroMQPoller::run);
+
+	m_zeroMQPollerThread->start();
+	zeroMQPoller.requestStart();
 
 	qDebug() << "Starting ZeroMQHandler";// in Thread " << thread()->currentThreadId();
 
 	while (true) {
 
 		// checks if process should be aborted
-		mutex.lock();
-		bool stop = _stop;
-		mutex.unlock();
+		m_mutex.lock();
+		bool stop = m_stop;
+		m_mutex.unlock();
 
-		zmq::message_t message;
+		m_pauseMutex.lock();
+		m_waitContition->wait(&m_pauseMutex);
+
+		//qDebug() << "Thread woked up!";
 
 		//try to receive a zeroMQ message
-		zmq::poll(&item, 1, -1);
+		//zmq::poll(&item, 1, -1);
+		
+		zmq::message_t message;
 
+		if (m_syncMessage[2] != MessageType::EMPTY)
+		{
+			sender.send(m_syncMessage, 3);
+			qDebug() << "Time:" << m_syncMessage[1];
+			m_syncMessage[2] = MessageType::EMPTY;
+		}
 		if (item.revents & ZMQ_POLLIN)
 		{
 			//try to receive a zeroMQ message
-			socket_->recv(&message);
+			qDebug() << "REC";
+			socket.recv(&message);
 		}
 
 		//check if recv timed out
-		if (message.size() != 0)
+		if (message.size() > 0)
 		{
 			QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
 
@@ -125,7 +189,7 @@ void ZeroMQHandler::run()
 			//short sceneObjectID = CharToShort(&msgArray[4]);
 			//short parameterID = CharToShort(&msgArray[6]);
 
-			if (_debug)
+			if (m_debug)
 			{
 				std::cout << "Msg: ";
 				std::cout << "cID: " << msgArray[0] << " "; //ClientID
@@ -141,25 +205,25 @@ void ZeroMQHandler::run()
 			}
 
 			//update ping timeout
-			auto client = pingMap.find(clientID);
-			if (client != pingMap.end())
+			auto client = m_pingMap.find(clientID);
+			if (client != m_pingMap.end())
 			{
 				client.value() = m_time;
 			}
 			else
 			{
-				pingMap.insert(clientID, m_time);
+				m_pingMap.insert(clientID, m_time);
 				
 				QByteArray newMessage((qsizetype)6, Qt::Uninitialized);
-				newMessage[0] = targetHostID;
-				newMessage[1] = _core->m_time;
+				newMessage[0] = m_targetHostID;
+				newMessage[1] = m_core->m_time;
 				newMessage[2] = MessageType::DATAHUB;
 				newMessage[3] = 0; // data hub type 0 = connection status update
 				newMessage[4] = 1; // new client registered
 				newMessage[5] = clientID; // new client ID
 
 				message = zmq::message_t(newMessage.constData(), static_cast<size_t>(newMessage.length()));
-				sender_->send(message);
+				sender.send(message);
 				
 				qInfo() << "New client registered: " << clientID;
 			}
@@ -171,14 +235,14 @@ void ZeroMQHandler::run()
 					qInfo() << "RESENDING UPDATES";
 
 					QByteArray newMessage((qsizetype)3, Qt::Uninitialized);
-					newMessage[0] = targetHostID;
-					newMessage[1] = _core->m_time;
+					newMessage[0] = m_targetHostID;
+					newMessage[1] = m_core->m_time;
 					newMessage[2] = MessageType::PARAMETERUPDATE;
 
-					foreach(QByteArray objectState, objectStateMap)
+					foreach(QByteArray objectState, m_objectStateMap)
 					{
 						newMessage.append(objectState);
-						if (_debug)
+						if (m_debug)
 						{
 							std::cout << "OutMsg (" << objectState.length() << "):";
 							foreach(const char c, objectState)
@@ -190,21 +254,21 @@ void ZeroMQHandler::run()
 					}
 
 					message = zmq::message_t(newMessage.constData(), static_cast<size_t>(newMessage.length()));
-					sender_->send(message);
+					sender.send(message);
 					break;
 				}
 				case MessageType::LOCK:
 				{
 					//store locked object for each client
 
-					QList<QByteArray> lockedIDs = lockMap.values(clientID);
+					QList<QByteArray> lockedIDs = m_lockMap.values(clientID);
 					QByteArray newValue = msgArray.sliced(3, 3);
 
 					if (lockedIDs.isEmpty())
 					{
 						if (msgArray[6])
 						{
-							lockMap.insert(clientID, newValue);
+							m_lockMap.insert(clientID, newValue);
 						}
 					}
 					else
@@ -213,22 +277,22 @@ void ZeroMQHandler::run()
 						{
 							if (lockedIDs.contains(newValue))
 							{
-								if (_debug)
+								if (m_debug)
 									std::cout << "Object " << 1234 << "already locked!";
 							}
 							else
-								lockMap.insert(clientID, newValue);
+								m_lockMap.insert(clientID, newValue);
 						}
 						else
 						{
 							if (lockedIDs.contains(newValue))
-								lockMap.remove(clientID, newValue);
-							else if (_debug)
+								m_lockMap.remove(clientID, newValue);
+							else if (m_debug)
 								std::cout << "Unknown Lock release request from client: " << 256 + (int)clientID;
 						}
 					}
 
-					if (_debug)
+					if (m_debug)
 					{
 						std::cout << "LockMsg: ";
 						std::cout << "cID: " << 256 + msgArray[0] << " "; //ClientID
@@ -238,7 +302,7 @@ void ZeroMQHandler::run()
 						std::cout << "state: " << msgArray[6]; //SceneObjectID
 						std::cout << std::endl;
 					}
-					sender_->send(message);
+					sender.send(message);
 					break;
 				}
 				case MessageType::PARAMETERUPDATE:
@@ -247,49 +311,43 @@ void ZeroMQHandler::run()
 					while (start < msgArray.size())
 					{
 						const int length = msgArray[start + 6];
-						objectStateMap.insert(msgArray.sliced(start, 5), msgArray.sliced(start, length));
+						m_objectStateMap.insert(msgArray.sliced(start, 5), msgArray.sliced(start, length));
 						start += length;
 					}
-					sender_->send(message);
+					sender.send(message);
 					break;
 				}
 				case MessageType::UNDOREDOADD:
 				case MessageType::RESETOBJECT:
 				case MessageType::SYNC:
-					sender_->send(message);
+					sender.send(message);
 					break;
 				}
 		}
 
-		if (syncMessage[2] != MessageType::EMPTY)
-		{
-			//sender_->send(syncMessage, 3);
-			//syncMessage[2] = MessageType::EMPTY;
-		}
-
 		//check if ping timed out for any client
-		foreach(unsigned int time, pingMap) {
+		foreach(const unsigned int time, m_pingMap) {
 			if (m_time-time > m_pingTimeout)
 			{
 				//connection to client lost
-				byte clientID = pingMap.key(time);
-				pingMap.remove(clientID);
+				byte clientID = m_pingMap.key(time);
+				m_pingMap.remove(clientID);
 
 				QByteArray newMessage((qsizetype)6, Qt::Uninitialized);
-				newMessage[0] = targetHostID;
-				newMessage[1] = _core->m_time;
+				newMessage[0] = m_targetHostID;
+				newMessage[1] = m_core->m_time;
 				newMessage[2] = MessageType::DATAHUB;
 				newMessage[3] = 0; // data hub type 0 = connection status update
 				newMessage[4] = 0; // client lost
 				newMessage[5] = clientID; // new client ID
 
 				message = zmq::message_t(newMessage.constData(), static_cast<size_t>(newMessage.length()));
-				sender_->send(message);
+				sender.send(message);
 
 				qInfo().nospace() << "Lost connection to: " << (int)clientID;
 
 				//check if client had lock
-				QList<QByteArray> values = lockMap.values(clientID);
+				QList<QByteArray> values = m_lockMap.values(clientID);
 				if (!values.isEmpty())
 				{
 					//release lock
@@ -298,8 +356,8 @@ void ZeroMQHandler::run()
 					for (int i = 0; i < values.count(); i++)
 					{
 						const char* value = values[i].constData();
-						lockReleaseMsg[0] = static_cast<char>(targetHostID);
-						lockReleaseMsg[1] = static_cast<char>(_core->m_time);  // time
+						lockReleaseMsg[0] = static_cast<char>(m_targetHostID);
+						lockReleaseMsg[1] = static_cast<char>(m_core->m_time);  // time
 						lockReleaseMsg[2] = static_cast<char>(MessageType::LOCK);
 						lockReleaseMsg[3] = value[0]; // sID
 						//memcpy(lockReleaseMsg + 4, value + 1, 2);
@@ -307,8 +365,8 @@ void ZeroMQHandler::run()
 						lockReleaseMsg[5] = value[2]; // oID part2
 						lockReleaseMsg[6] = static_cast<char>(false);
 
-						sender_->send(lockReleaseMsg, 7);
-						lockMap.remove(clientID);
+						sender.send(lockReleaseMsg, 7);
+						m_lockMap.remove(clientID);
 					}
 				}
 			}
@@ -318,14 +376,95 @@ void ZeroMQHandler::run()
 			qDebug() << "Stopping ZeroMQHandler";// in Thread "<<thread()->currentThreadId();
 			break;
 		}
+		m_pauseMutex.unlock();
+
+		QThread::yieldCurrentThread();
+	}
+
+	//zeroMQPoller.requestStop();
+	//m_zeroMQPollerThread->exit();
+
+	// Set _working to false -> process cannot be aborted anymore
+	m_mutex.lock();
+	m_working = false;
+	m_mutex.unlock();
+
+	qDebug() << "ZeroMQHandler process stopped";// in Thread "<<thread()->currentThreadId();
+
+	emit stopped();
+}
+
+
+CommandHandler::CommandHandler(DataHub::Core* core, QString ip, bool debug, zmq::context_t* context) : ThreadBase(core)
+{
+	m_IPadress = ip;
+	m_context = context;
+	m_debug = debug;
+	m_stop = false;
+	m_working = false;
+}
+
+void CommandHandler::run()
+{
+	zmq::socket_t socket(*m_context, ZMQ_REP);
+	socket.bind(QString("tcp://" + m_IPadress + ":5558").toLatin1().data());
+
+	qDebug() << "Starting CommandHandler";// in Thread " << thread()->currentThreadId();
+
+	while (true) {
+
+		// checks if process should be aborted
+		m_mutex.lock();
+		bool stop = m_stop;
+		m_mutex.unlock();
+
+		zmq::message_t message;
+		socket.recv(&message);
+
+		if (message.size() > 0)
+		{
+			QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
+
+			byte clientID = msgArray[0];
+			byte msgTime = msgArray[1];
+			byte msgType = msgArray[2];
+
+			switch (msgType)
+			{
+				case ZeroMQHandler::MessageType::PING:
+				{
+					char responseMsg[3];
+					responseMsg[0] = m_targetHostID;
+					responseMsg[1] = m_core->m_time;
+					responseMsg[2] = ZeroMQHandler::MessageType::PING;
+
+					socket.send(responseMsg, 3);
+					break;
+				}
+				case ZeroMQHandler::MessageType::DATAHUB:
+				{
+					// ...
+					break;
+				}
+				default:
+					break;
+			}
+		}
+
+		if (stop) {
+			qDebug() << "Stopping CommandHandler";// in Thread "<<thread()->currentThreadId();
+			break;
+		}
+
+		QThread::yieldCurrentThread();
 	}
 
 	// Set _working to false -> process cannot be aborted anymore
-	mutex.lock();
-	_working = false;
-	mutex.unlock();
+	m_mutex.lock();
+	m_working = false;
+	m_mutex.unlock();
 
-	qDebug() << "ZeroMQHandler process stopped";// in Thread "<<thread()->currentThreadId();
+	qDebug() << "CommandHandler process stopped";// in Thread "<<thread()->currentThreadId();
 
 	emit stopped();
 }

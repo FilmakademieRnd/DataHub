@@ -59,7 +59,7 @@ namespace DataHub {
 
 	public:
 		TimerThread() : m_interval(1000) {}
-		TimerThread(int interval) : m_interval(interval) {}
+		TimerThread(float interval) : m_interval(qCeil(interval)) {}
 
 	private:
 		int m_interval;

@@ -62,7 +62,9 @@ namespace DataHub {
 		bool m_debug;
 		zmq::context_t *m_context;
 		QThread* m_zeroMQHandlerThread;
+		QThread* m_commandHandlerThread;
 		ZeroMQHandler* m_zeroMQHandler;
+		CommandHandler* m_commandHandler;
 	protected:
 		void init();
 	private:
