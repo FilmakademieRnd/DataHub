@@ -23,8 +23,8 @@ Distribution and Synchronization Server may under no circumstances be used for
 racist, sexual or any illegal purposes. In all non-commercial productions, 
 scientific publications, prototypical non-commercial software tools, etc. 
 using the Scene Distribution and/or Synchronization Server Filmakademie has 
-to be named as follows: “VPET-Virtual Production Editing Tool by Filmakademie 
-Baden-Württemberg, Animationsinstitut (http://research.animationsinstitut.de)“.
+to be named as follows: "VPET-Virtual Production Editing Tool by Filmakademie 
+Baden-Wuerttemberg, Animationsinstitut (http://research.animationsinstitut.de)".
 
 In case a company or individual would like to use the Scene Distribution and/or 
 Synchronization Server in a commercial surrounding or for commercial purposes, 
@@ -37,8 +37,6 @@ will have to contact Filmakademie (research<at>filmakademie.de).
 
 #include <QObject>
 #include <QMutex>
-#include <QMultiMap>
-#include <QElapsedTimer>
 #include <nzmqt/nzmqt.hpp>
 #include "core.h"
 
@@ -47,50 +45,64 @@ class ThreadBase : public QObject
     Q_OBJECT
 
 public:
-    // constructor
+    //! 
+    //! Constructor
+    //! 
+    //! @param core A reference to the DataHub core.
+    //! 
     explicit ThreadBase(DataHub::Core* core);
 
-    //request this process to start working
+    //! Request this process to start working.
     virtual void requestStart();
 
-    //request this process to stop working
+    //! Request this process to stop working.
     virtual void requestStop();
 
-public slots:
-    // default loop
-    virtual void run() = 0;
-
 protected:
-    //id displayed as clientID for messages redistributed through syncServer
-    byte m_targetHostID = 0;
-
-    //protect access to _stop
+    //! Default mutex used to lock the thread.
     QMutex m_mutex;
 
-    //if true process is stopped
+    //! If true process is stopped.
     bool m_stop;
 
-    //if true process is running
+    //! If true process is running.
     bool m_working;
 
-    //a reference to the core
+    //! A reference to the DataHub core.
     DataHub::Core* m_core;
+
+signals:
+    //!
+    //! Signal emitted when process is finished.
+    //!
+    void stopped();
+
+public slots:
+    //! Default thread worker loop.
+    virtual void run() = 0;
 };
 
-class ZeroMQPoller : public ThreadBase
+class BroadcastPoller : public ThreadBase
 {
     Q_OBJECT
 public:
-    explicit ZeroMQPoller(DataHub::Core* core, zmq::pollitem_t* item, QWaitCondition* waitCondition);
+    //! 
+    //! Constructor
+    //! 
+    //! @param core A reference to the DataHub core.
+    //! @param item A reference to the ZMQ polling intem.
+    //! @param waitCondition A reference to the wait condition for pausing the broadcast thread.
+    explicit BroadcastPoller(DataHub::Core* core, zmq::pollitem_t* item, QWaitCondition* waitCondition) : ThreadBase(core), m_item(item), m_waitCondition(waitCondition) {}
 
 public slots:
+    //! Default thread worker loop.
     void run();
 
 private:
-    // reference to the zmq poller
+    //! A reference to the zmq poller.
     zmq::pollitem_t *m_item;
     
-    //reference to shared mutex for pausing the thread
+    //! A reference to shared mutex for pausing the broadcast thread.
     QWaitCondition *m_waitCondition;
 };
 
@@ -98,9 +110,18 @@ class ZeroMQHandler : public ThreadBase
 {
     Q_OBJECT
 public:
-    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
+	//! 
+    //! Constructor
+    //! 
+    //! @param core A reference to the DataHub core.
+    //! @param IPAdress The IP adress the BroadcastHandler shall connect to. 
+    //! @param debug Flag determin wether debug informations shall be printed.
+    //! @param context The ZMQ context used by the BroadcastHandler.
+    //! 
+    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress, bool debug, zmq::context_t* context) : ThreadBase(core), m_IPadress(IPAdress), m_debug(debug), m_context(context) {}
 
-    enum MessageType
+	//! Tracer message types.
+	enum MessageType
     {
         PARAMETERUPDATE, LOCK, // node
         SYNC, PING, RESENDUPDATE, // sync
@@ -109,43 +130,25 @@ public:
         EMPTY = 255
     };
 
-private:
-    //shall debug messages be printed
+protected:
+    //! Shall debug messages be printed.
     bool m_debug;
 
-    QMutex m_pauseMutex;
+    //! ID displayed as clientID for messages redistributed through syncServer.
+    byte m_targetHostID = 0;
 
-    QThread* m_zeroMQPollerThread;
-
-    QWaitCondition* m_waitContition;
-
-    //zeroMQ socket
-    zmq::socket_t* m_socket;
-    zmq::socket_t* m_sender;
-
-    //zeroMQ context
+    //! ZeroMQ context.
     zmq::context_t* m_context;
 
-    //syncMessage
-    byte m_syncMessage[3] = { m_targetHostID,0,MessageType::EMPTY };
-
-    //server IP
+    //! The server IP adress.
     QString m_IPadress;
 
-    //map of last states
-    QMap<QByteArray, QByteArray> m_objectStateMap;
-
-    //map of ping timings
-    QMap<byte, unsigned int> m_pingMap;
-
-    //map of last states
-    QMultiMap<byte, QByteArray> m_lockMap;
-
-    //the local elapsed time in seconds since object has been created.
-    unsigned int m_time = 0;
-
-    static const unsigned int m_pingTimeout = 4;
-
+    //! 
+    //! Helper function to convert characters to shorts. 
+    //! 
+    //! @param buf The char buffer to be converted.
+    //! @return The converted and copyed buffer as short.
+    //! 
     inline const short CharToShort(const char* buf) const
     {
         short val;
@@ -154,49 +157,11 @@ private:
     }
 
 signals:
-
-    //signal emitted when process is finished
+    //!
+    //! Signal emitted when process is finished.
+    //!
     void stopped();
-
-public slots:
-    //execute operations
-    void run();
-
-private slots:
-    //create a new sync message
-    void createSyncMessage(int time);
 };
 
-class CommandHandler : public ThreadBase
-{
-    Q_OBJECT
-public:
-    explicit CommandHandler(DataHub::Core* core, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
-
-
-private:
-    //shall debug messages be printed
-    bool m_debug;
-
-    //zeroMQ socket
-    zmq::socket_t* m_socket;
-
-    //zeroMQ context
-    zmq::context_t* m_context;
-
-    //server IP
-    QString m_IPadress;
-
-
-signals:
-
-    //signal emitted when process is finished
-    void stopped();
-
-public slots:
-    //execute operations
-    void run();
-
-};
 
 #endif // ZEROMQHANDLER_H

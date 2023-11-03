@@ -39,7 +39,8 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include <QThread>
 #include <QMutex>
 #include "plugininterface.h"
-#include "zeroMQHandler.h"
+#include "broadcastHandler.h"
+#include "commandHandler.h"
 
 
 namespace DataHub {
@@ -51,7 +52,7 @@ namespace DataHub {
 		Q_INTERFACES(DataHub::PluginInterface)
 
 	public:
-		SyncServer() : m_ownIP(""), m_debug(false), m_context(new zmq::context_t(1)), m_zeroMQHandler(0), m_zeroMQHandlerThread(0) { }
+		SyncServer() : m_ownIP(""), m_debug(false), m_context(new zmq::context_t(1)), m_broadcastHandler(0), m_broadcastHandlerThread(0) { }
 	
 	public:
 		virtual void run();
@@ -61,9 +62,9 @@ namespace DataHub {
 		QString m_ownIP;
 		bool m_debug;
 		zmq::context_t *m_context;
-		QThread* m_zeroMQHandlerThread;
+		QThread* m_broadcastHandlerThread;
 		QThread* m_commandHandlerThread;
-		ZeroMQHandler* m_zeroMQHandler;
+		BroadcastHandler* m_broadcastHandler;
 		CommandHandler* m_commandHandler;
 	protected:
 		void init();

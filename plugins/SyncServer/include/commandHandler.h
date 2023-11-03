@@ -32,62 +32,52 @@ software based on these components or any part thereof, the company/individual
 will have to contact Filmakademie (research<at>filmakademie.de).
 -----------------------------------------------------------------------------
 */
+#ifndef COMMANDHANDLER_H
+#define COMMANDHANDLER_H
 
-#include "zeroMQHandler.h"
+#include "broadcastHandler.h"
 
-#include <QDebug>
-
-ThreadBase::ThreadBase(DataHub::Core* core) : m_core(core)
+class CommandHandler : public ZeroMQHandler
 {
-	m_stop = false;
-	m_working = false;
-}
+	Q_OBJECT
+public:
+	//! 
+	//! Constructor
+	//! 
+    //! @param core A reference to the DataHub core.
+    //! @param zmqHandler A reference to the broadcastHandler. 
+    //! @param IPAdress The IP adress the CommandHandler shall connect to. 
+    //! @param debug Flag determin wether debug informations shall be printed.
+    //! @param context The ZMQ context used by the CommandHandler.
+    //! 
+    explicit CommandHandler(DataHub::Core* core, BroadcastHandler* broadcastHandler, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
 
-void ThreadBase::requestStart()
-{
-	m_mutex.lock();
-	m_working = true;
-	m_stop = false;
-	qInfo() << metaObject()->className() << " requested to start"; 
-	m_mutex.unlock();
-}
+private:
+    //! The global timeout for tracer clients.
+    static const unsigned int m_pingTimeout = 3;
 
-void ThreadBase::requestStop()
-{
-	m_mutex.lock();
-	if (m_working) {
-		m_stop = true;
-		qInfo() << metaObject()->className() << " stopping"; 
-	}
-	m_mutex.unlock();
-}
+    //! The local elapsed time in seconds since object has been created.
+    unsigned int m_time = 0;
 
-void BroadcastPoller::run()
-{
-	while (true) {
-		// checks if process should be aborted
-		m_mutex.lock();
-		bool stop = m_stop;
-		m_mutex.unlock();
+    //! A reference to the zeroMQHandler. 
+    BroadcastHandler* m_zmqHandler;
 
-		//try to receive a zeroMQ message
-		zmq::poll(m_item, 1, -1);
+    //! The map storing the registered clients ping times.
+    QMap<byte, unsigned int> m_pingMap;
 
-		if (m_item->revents & ZMQ_POLLIN)
-			m_waitCondition->wakeOne();
+private:
+    void updatePingTimeouts(byte clientID);
+    void checkPingTimeouts();
+signals:
+    //signal emitted when process is finished
+    void stopped();
 
-		if (stop) {
-			qDebug() << "Stopping " << metaObject()->className();
-			break;
-		}
+public slots:
+    //execute operations
+    void run();
 
-		QThread::yieldCurrentThread();
-	}
+private slots:
+    void tickTime(int time);
+};
 
-	// Set _working to false -> process cannot be aborted anymore
-	m_mutex.lock();
-	m_working = false;
-	m_mutex.unlock();
-
-	qDebug() << metaObject()->className() << " process stopped"; // in Thread " << thread()->currentThreadId();
-}
+#endif // COMMANDHANDLER_H

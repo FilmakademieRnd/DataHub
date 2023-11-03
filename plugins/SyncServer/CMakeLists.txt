@@ -4,9 +4,11 @@ qt_add_library(${target_name} SHARED
     SyncServer.cpp
 	SyncServer.h
 	src/zeroMQHandler.cpp
-	src/objectStateHandler.cpp
+	src/broadcastHandler.cpp
+	src/commandHandler.cpp
 	include/zeroMQHandler.h
-	include/objectStateHandler.h
+	include/broadcastHandler.h
+	include/commandHandler.h
 )
 target_include_directories(${target_name} 
     INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
