@@ -91,3 +91,4 @@ void BroadcastPoller::run()
 
 	qDebug() << metaObject()->className() << " process stopped"; // in Thread " << thread()->currentThreadId();
 }
+

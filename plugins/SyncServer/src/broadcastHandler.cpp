@@ -259,8 +259,8 @@ void BroadcastHandler::run()
 		QThread::yieldCurrentThread();
 	}
 
-	//zeroMQPoller.requestStop();
-	//m_zeroMQPollerThread->exit();
+	zeroMQPoller.requestStop();
+	m_zeroMQPollerThread->exit();
 
 	// Set _working to false -> process cannot be aborted anymore
 	m_mutex.lock();

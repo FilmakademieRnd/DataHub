@@ -119,6 +119,9 @@ namespace DataHub {
     {
         m_broadcastHandler->requestStop();
         m_broadcastHandlerThread->exit();
+
+        m_commandHandler->requestStop();
+        m_commandHandlerThread->exit();
     }
 
     void SyncServer::InitServer()
