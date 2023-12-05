@@ -36,7 +36,8 @@ will have to contact Filmakademie (research<at>filmakademie.de).
 #include "BroadcastHandler.h"
 #include <iostream>
 
-BroadcastHandler::BroadcastHandler(DataHub::Core* core, QString IPAdress, bool debug, zmq::context_t* context) : ZeroMQHandler(core, IPAdress, debug, context)
+BroadcastHandler::BroadcastHandler(DataHub::Core* core, QString IPAdress, bool debug, bool parameterHistory, bool lockHistory, zmq::context_t* context) : 
+									m_parameterHistory(parameterHistory), m_lockHistory(lockHistory), ZeroMQHandler(core, IPAdress, debug, context)
 {
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
 }
@@ -61,9 +62,9 @@ void BroadcastHandler::BroadcastMessage(QByteArray message)
 	m_waitContition->wakeOne();
 }
 
-QMultiMap<byte, QByteArray>* BroadcastHandler::GetLockMap()
+QMultiMap<byte, QByteArray> BroadcastHandler::GetLockMap()
 {
-	return &m_lockMap;
+	return m_lockMap;
 }
 
 void BroadcastHandler::run()
@@ -107,19 +108,19 @@ void BroadcastHandler::run()
 
 		zmq::message_t message;
 
+		m_mutex.lock();
 		if (m_syncMessage[2] != MessageType::EMPTY)
 		{
 			sender.send(m_syncMessage, 3);
-			qDebug() << "Time:" << m_syncMessage[1];
 			m_syncMessage[2] = MessageType::EMPTY;
 		}
-		m_mutex.lock();
-		if (!m_broadcastMessage.isEmpty())
+		if (!m_broadcastMessage.isNull() && !m_broadcastMessage.isEmpty())
 		{
 			sender.send(m_broadcastMessage.constData(), static_cast<size_t>(m_broadcastMessage.length()));
 			m_broadcastMessage.clear();
 		}
 		m_mutex.unlock();
+		
 		if (item.revents & ZMQ_POLLIN)
 		{
 			//try to receive a zeroMQ message
@@ -184,60 +185,65 @@ void BroadcastHandler::run()
 			}
 			case MessageType::LOCK:
 			{
-				//store locked object for each client
-
-				QList<QByteArray> lockedIDs = m_lockMap.values(clientID);
-				QByteArray newValue = msgArray.sliced(3, 3);
-
-				if (lockedIDs.isEmpty())
+				if (m_lockHistory)
 				{
-					if (msgArray[6])
+					//store locked object for each client
+					QList<QByteArray> lockedIDs = m_lockMap.values(clientID);
+					QByteArray newValue = msgArray.sliced(3, 3);
+
+					if (lockedIDs.isEmpty())
 					{
-						m_lockMap.insert(clientID, newValue);
-					}
-				}
-				else
-				{
-					if (msgArray[6])
-					{
-						if (lockedIDs.contains(newValue))
+						if (msgArray[6])
 						{
-							if (m_debug)
-								std::cout << "Object " << 1234 << "already locked!";
-						}
-						else
 							m_lockMap.insert(clientID, newValue);
+						}
 					}
 					else
 					{
-						if (lockedIDs.contains(newValue))
-							m_lockMap.remove(clientID, newValue);
-						else if (m_debug)
-							std::cout << "Unknown Lock release request from client: " << 256 + (int)clientID;
+						if (msgArray[6])
+						{
+							if (lockedIDs.contains(newValue))
+							{
+								if (m_debug)
+									std::cout << "Object " << newValue << "already locked!";
+							}
+							else
+								m_lockMap.insert(clientID, newValue);
+						}
+						else
+						{
+							if (lockedIDs.contains(newValue))
+								m_lockMap.remove(clientID, newValue);
+							else if (m_debug)
+								std::cout << "Unknown Lock release request from client: " << 256 + (int)clientID;
+						}
 					}
-				}
 
-				if (m_debug)
-				{
-					std::cout << "LockMsg: ";
-					std::cout << "cID: " << 256 + msgArray[0] << " "; //ClientID
-					std::cout << "t: " << msgArray[1] << " "; //Time
-					std::cout << "sID: " << msgArray[3]; //SceneObjectID
-					std::cout << "oID: " << CharToShort(&msgArray[4]); //SceneObjectID
-					std::cout << "state: " << msgArray[6]; //SceneObjectID
-					std::cout << std::endl;
+					if (m_debug)
+					{
+						std::cout << "LockMsg: ";
+						std::cout << "cID: " << 256 + msgArray[0] << " "; //ClientID
+						std::cout << "t: " << msgArray[1] << " "; //Time
+						std::cout << "sID: " << msgArray[3]; //SceneObjectID
+						std::cout << "oID: " << CharToShort(&msgArray[4]); //SceneObjectID
+						std::cout << "state: " << msgArray[6]; //SceneObjectID
+						std::cout << std::endl;
+					}
 				}
 				sender.send(message);
 				break;
 			}
 			case MessageType::PARAMETERUPDATE:
 			{
-				int start = 3;
-				while (start < msgArray.size())
+				if (m_parameterHistory)
 				{
-					const int length = msgArray[start + 6];
-					m_objectStateMap.insert(msgArray.sliced(start, 5), msgArray.sliced(start, length));
-					start += length;
+					int start = 3;
+					while (start < msgArray.size())
+					{
+						const int length = msgArray[start + 6];
+						m_objectStateMap.insert(msgArray.sliced(start, 5), msgArray.sliced(start, length));
+						start += length;
+					}
 				}
 				sender.send(message);
 				break;

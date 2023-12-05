@@ -52,7 +52,7 @@ namespace DataHub {
 		Q_INTERFACES(DataHub::PluginInterface)
 
 	public:
-		SyncServer() : m_ownIP(""), m_debug(false), m_context(new zmq::context_t(1)), m_broadcastHandler(0), m_broadcastHandlerThread(0) { }
+		SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_broadcastHandler(0), m_broadcastHandlerThread(0) { }
 	
 	public:
 		virtual void run();
@@ -61,6 +61,8 @@ namespace DataHub {
 	private:
 		QString m_ownIP;
 		bool m_debug;
+		bool m_lockHistory;
+		bool m_paramHistory;
 		zmq::context_t *m_context;
 		QThread* m_broadcastHandlerThread;
 		QThread* m_commandHandlerThread;

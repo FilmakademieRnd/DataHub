@@ -67,14 +67,16 @@ void BroadcastPoller::run()
 	while (true) {
 		// checks if process should be aborted
 		m_mutex.lock();
+
 		bool stop = m_stop;
-		m_mutex.unlock();
 
 		//try to receive a zeroMQ message
 		zmq::poll(m_item, 1, -1);
 
-		if (m_item->revents & ZMQ_POLLIN)
+		//if (m_item->revents & ZMQ_POLLIN)
 			m_waitCondition->wakeOne();
+
+		m_mutex.unlock();
 
 		if (stop) {
 			qDebug() << "Stopping " << metaObject()->className();

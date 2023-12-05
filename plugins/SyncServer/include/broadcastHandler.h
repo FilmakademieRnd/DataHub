@@ -50,9 +50,12 @@ public:
     //! @param debug Flag determin wether debug informations shall be printed.
     //! @param context The ZMQ context used by the BroadcastHandler.
     //! 
-    explicit BroadcastHandler(DataHub::Core* core, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
+    explicit BroadcastHandler(DataHub::Core* core, QString IPAdress = "", bool debug = false, bool parameterHistory = true, bool lockHistory = true, zmq::context_t* context = NULL);
 
 private:
+
+    bool m_parameterHistory;
+    bool m_lockHistory;
 
     //! Mutex used for pausing the BroadcastHandler thread.
     QMutex m_pauseMutex;
@@ -101,7 +104,7 @@ public:
     //!
     //! @return The reference to the lockMap.
     //!
-    QMultiMap<byte, QByteArray>* GetLockMap();
+    QMultiMap<byte, QByteArray> GetLockMap();
 
 signals:
     //!

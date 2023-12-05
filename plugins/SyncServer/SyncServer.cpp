@@ -84,6 +84,16 @@ namespace DataHub {
                         std::cout << "Debug output enabled." << std::endl;
                         m_debug = true;
                     }
+                    else if (commands[i] == "-np")
+                    {
+                        std::cout << "No parameter history." << std::endl;
+                        m_paramHistory = false;
+                    }
+                    else if (commands[i] == "-nl")
+                    {
+                        std::cout << "No lock history." << std::endl;
+                        m_lockHistory = false;
+                    }
                     else if (commands[i] == "-ownIP" && commands.length() > i+1)
                     {
                         m_ownIP = "f";
@@ -128,7 +138,7 @@ namespace DataHub {
     {
         //create thread to receive zeroMQ messages from clients
        
-        m_broadcastHandler = new BroadcastHandler(core(), m_ownIP, m_debug, m_context);
+        m_broadcastHandler = new BroadcastHandler(core(), m_ownIP, m_debug, m_paramHistory, m_lockHistory, m_context);
         m_broadcastHandlerThread = new QThread(this);
 
         //create thread to receive command messages from clients
@@ -154,6 +164,8 @@ namespace DataHub {
         std::cout << "-h:       display this help" << std::endl;
         std::cout << "-ownIP:   IP address of this computer (required)" << std::endl;
         std::cout << "-d:       run with debug output" << std::endl;
+        std::cout << "-np:      run without parameter history" << std::endl;
+        std::cout << "-nl:      run without lock history" << std::endl;
     }
 
 }

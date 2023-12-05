@@ -70,10 +70,7 @@ void CommandHandler::updatePingTimeouts(byte clientID)
 
 		m_zmqHandler->BroadcastMessage(newMessage);
 
-		//message = zmq::message_t(newMessage.constData(), static_cast<size_t>(newMessage.length()));
-		//sender.send(message);
-
-		qInfo() << "New client registered: " << clientID;
+		qInfo() << "New client registered:" << clientID;
 	}
 }
 void CommandHandler::checkPingTimeouts()
@@ -97,20 +94,17 @@ void CommandHandler::checkPingTimeouts()
 
 			m_zmqHandler->BroadcastMessage(newMessage);
 
-			//message = zmq::message_t(newMessage.constData(), static_cast<size_t>(newMessage.length()));
-			//sender.send(message);
-
-			qInfo().nospace() << "Lost connection to: " << (int)clientID;
+			qInfo().nospace() << "Lost connection to client:" << clientID;
 
 			//check if client had lock
 			m_mutex.lock();
-			QList<QByteArray> values = m_zmqHandler->GetLockMap()->values(clientID);
+			QList<QByteArray> values = m_zmqHandler->GetLockMap().values(clientID);
 			m_mutex.unlock();
 
 			if (!values.isEmpty())
 			{
 				//release lock
-				qInfo() << "Resetting lock!";
+				qInfo() << "Resetting locks!";
 				char lockReleaseMsg[7];
 				for (int i = 0; i < values.count(); i++)
 				{
@@ -127,7 +121,7 @@ void CommandHandler::checkPingTimeouts()
 					m_zmqHandler->BroadcastMessage(lockReleaseMsg);
 					//sender.send(lockReleaseMsg, 7);
 					m_mutex.lock();
-					m_zmqHandler->GetLockMap()->remove(clientID);
+					m_zmqHandler->GetLockMap().remove(clientID);
 					m_mutex.unlock();
 				}
 			}
@@ -138,6 +132,8 @@ void CommandHandler::checkPingTimeouts()
 void CommandHandler::run()
 {
 	zmq::socket_t socket(*m_context, ZMQ_REP);
+	//socket.setsockopt(ZMQ_CONNECT_TIMEOUT, 2000);
+	//socket.setsockopt(ZMQ_SNDTIMEO, 2000);
 	socket.bind(QString("tcp://" + m_IPadress + ":5558").toLatin1().data());
 
 	qDebug() << "Starting " << metaObject()->className();
@@ -168,10 +164,12 @@ void CommandHandler::run()
 				responseMsg[1] = m_core->m_time;
 				responseMsg[2] = BroadcastHandler::MessageType::PING;
 
-				Sleep(100);
+				Sleep(10);
 				socket.send(responseMsg, 3);
 
+				m_mutex.lock();
 				updatePingTimeouts(clientID);
+				m_mutex.unlock();
 
 				break;
 			}
