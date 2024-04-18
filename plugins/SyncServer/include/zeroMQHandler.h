@@ -127,6 +127,7 @@ public:
         SYNC, PING, RESENDUPDATE, // sync
         UNDOREDOADD, RESETOBJECT, // undo redo
         DATAHUB, // DataHub
+        RPC, // RPC
         EMPTY = 255
     };
 

@@ -73,6 +73,7 @@ void CommandHandler::updatePingTimeouts(byte clientID)
 		qInfo() << "New client registered:" << clientID;
 	}
 }
+
 void CommandHandler::checkPingTimeouts()
 {
 	//check if ping timed out for any client

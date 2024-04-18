@@ -251,6 +251,7 @@ void BroadcastHandler::run()
 			case MessageType::UNDOREDOADD:
 			case MessageType::RESETOBJECT:
 			case MessageType::SYNC:
+			case MessageType::RPC:
 				sender.send(message);
 				break;
 			}
