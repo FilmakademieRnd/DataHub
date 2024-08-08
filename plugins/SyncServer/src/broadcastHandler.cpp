@@ -38,13 +38,13 @@ BroadcastHandler::BroadcastHandler(DataHub::Core* core, QString IPAdress, bool d
 
 void BroadcastHandler::createSyncMessage(int time)
 {
-	qInfo() << "Time: " << time;
-
 	m_mutex.lock();
 	m_syncMessage[0] = m_targetHostID;
 	m_syncMessage[1] = time;
 	m_syncMessage[2] = MessageType::SYNC;
 	m_mutex.unlock();
+
+	std::cout << "\r" << "Time: " << time << " ";
 
 	m_waitContition->wakeOne();
 }
@@ -137,17 +137,17 @@ void BroadcastHandler::run()
 
 			if (m_debug)
 			{
-				std::cout << "Msg: ";
-				std::cout << "cID: " << msgArray[0] << " "; //ClientID
-				std::cout << "t: " << msgArray[1] << " "; //Time
-				std::cout << "mtype: " << static_cast<MessageType>(msgArray[2]) << " "; //MessageType
 				if (msgType == PARAMETERUPDATE)
 				{
-					std::cout << "sID: " << msgArray[3] << " "; //SceneID
+					std::cout << "RPCMsg: ";
+					std::cout << "cID: " << (int)(char)msgArray[0] + 256 << " "; //ClientID
+					std::cout << "t: " << (unsigned int)msgArray[1] << " "; //Time
+					//std::cout << "mtype: " << static_cast<MessageType>(msgArray[2]) << " "; //MessageType
+					std::cout << "sID: " << (int)(char)msgArray[3] + 256 << " "; //SceneID
 					std::cout << "oID: " << CharToShort(&msgArray[4]) << " "; //SceneObjectID
 					std::cout << "pID: " << CharToShort(&msgArray[6]); //ParamID
+					std::cout << std::endl;
 				}
-				std::cout << std::endl;
 			}
 
 			switch (msgType)
@@ -201,7 +201,7 @@ void BroadcastHandler::run()
 							if (lockedIDs.contains(newValue))
 							{
 								if (m_debug)
-									std::cout << "Object " << newValue << "already locked!";
+									std::cout << "Object " << 256 + (int)(char) msgArray[6] << "already locked!" << std::endl;
 							}
 							else
 								m_lockMap.insert(clientID, newValue);
@@ -211,18 +211,18 @@ void BroadcastHandler::run()
 							if (lockedIDs.contains(newValue))
 								m_lockMap.remove(clientID, newValue);
 							else if (m_debug)
-								std::cout << "Unknown Lock release request from client: " << 256 + (int)clientID;
+								std::cout << "Unknown Lock release request from client: " << 256 + (int)clientID << std::endl;
 						}
 					}
 
 					if (m_debug)
 					{
 						std::cout << "LockMsg: ";
-						std::cout << "cID: " << 256 + msgArray[0] << " "; //ClientID
-						std::cout << "t: " << msgArray[1] << " "; //Time
-						std::cout << "sID: " << msgArray[3]; //SceneObjectID
-						std::cout << "oID: " << CharToShort(&msgArray[4]); //SceneObjectID
-						std::cout << "state: " << msgArray[6]; //SceneObjectID
+						std::cout << "cID: " << (int)(char)msgArray[0] + 256 << " "; //ClientID
+						std::cout << "t: " << (unsigned int)msgArray[1] << " "; //Time
+						std::cout << "sID: " << (int)(char)msgArray[3] + 256 << " "; //SceneObjectID
+						std::cout << "oID: " << CharToShort(&msgArray[4]) << " "; //SceneObjectID
+						std::cout << "state: " << (unsigned int)msgArray[6]; //lock state
 						std::cout << std::endl;
 					}
 				}
