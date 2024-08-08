@@ -22,7 +22,7 @@ Copyright (c) 2024 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Labs
 https://research.animationsinstitut.de/datahub
 https://github.com/FilmakademieRnd/DataHub
 
-Datahub is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Labs in the scope of the EU funded project MAX-R (101070072) and funding on the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace (610005) and SAUCE (780470) have inspired the DataHub development.
+DataHub is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Labs in the scope of the EU funded project MAX-R (101070072) and funding on the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace (610005) and SAUCE (780470) have inspired the DataHub development.
 
 The DataHub is intended for research and development purposes only. Commercial use of any kind is not permitted.
 
