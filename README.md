@@ -1,5 +1,6 @@
 # DataHub
 A software agnostic communication infrastructure and toolset for plugging open-source tools into the pipeline of Virtual Productions and XR Productions. It is based on the [TRACER Foundation](https://github.com/FilmakademieRnd/TRACER) framework.
+![](/doc/img/TRACER_Shematic_1k.png)
 ## About
 
 ![](/doc/img/FA_AI_Logo.png) &nbsp;&nbsp;&nbsp;&nbsp;
