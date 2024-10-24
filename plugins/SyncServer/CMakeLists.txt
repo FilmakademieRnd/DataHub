@@ -14,8 +14,7 @@ target_include_directories(${target_name}
     INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
 	PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
 	PRIVATE ${CMAKE_SOURCE_DIR}/core
-	PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty/nzmqt/include
-	PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty/nzmqt/3rdparty/cppzmq
+	PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty/cppzmq/include
 	PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty/zeromq/include
 )
 target_link_directories(${target_name} 
@@ -27,7 +26,7 @@ target_link_libraries(${target_name} PRIVATE
 	Core
 	Qt6::Core
 	Qt6::Network
-	libzmq-v142-mt-4_3_5
+	libzmq-v143-mt-4_3_5
 )
 
 set_target_properties (${target_name} PROPERTIES

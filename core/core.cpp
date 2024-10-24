@@ -18,7 +18,7 @@ is limited to malice. DataHub may under no circumstances be used for racist,
 sexual or any illegal purposes. In all non-commercial productions, scientific
 publications, prototypical non-commercial software tools, etc. using the DataHub
 Filmakademie has to be named as follows: "DataHub by Filmakademie
-Baden-Württemberg, Animationsinstitut (http://research.animationsinstitut.de)".
+Baden-Wuerttemberg, Animationsinstitut (http://research.animationsinstitut.de)".
 
 In case a company or individual would like to use the Data Hub in a commercial
 surrounding or for commercial purposes, software based on these components or
@@ -97,8 +97,13 @@ namespace DataHub {
 	{
 		m_time = (m_time > (m_timesteps - 2) ? (unsigned char)0 : m_time += 1);
 
+        emit tickTick(m_time);
+
         if ((m_time % s_framerate) == 0) 
             emit tickSecond(m_time);
+
+        //if ((m_time % 2) == 0)
+          //  emit tickHalf(m_time);
 	}
 
     //!
@@ -107,6 +112,11 @@ namespace DataHub {
     void Core::updateTimeRand()
     {
         emit tickSecondRandom(m_time);
+    }
+
+    void Core::storeData(QByteArray data)
+    {
+        emit storeDataSignal(data);
     }
 
     void Core::loadPlugins()
@@ -130,13 +140,16 @@ namespace DataHub {
                     qDebug() << "Plugin " + filePath + " loaded.";
                     pluginInterface->setCore(this);
                     pluginInterface->init();
-                    pluginInterface->run();
+                    //pluginInterface->run();
                 }
                 else
                     pluginLoader.unload();
             }
             else
                 qDebug() << "Plugin " + filePath + " could not be loaded.";
+        }
+        for (DataHub::PluginInterface* plugin : s_plugins) {
+            plugin->run();
         }
 
     }

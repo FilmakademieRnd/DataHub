@@ -18,7 +18,7 @@ is limited to malice. DataHub may under no circumstances be used for racist,
 sexual or any illegal purposes. In all non-commercial productions, scientific
 publications, prototypical non-commercial software tools, etc. using the DataHub
 Filmakademie has to be named as follows: "DataHub by Filmakademie
-Baden-Württemberg, Animationsinstitut (http://research.animationsinstitut.de)".
+Baden-Wuerttemberg, Animationsinstitut (http://research.animationsinstitut.de)".
 
 In case a company or individual would like to use the Data Hub in a commercial
 surrounding or for commercial purposes, software based on these components or
@@ -30,7 +30,9 @@ any part thereof, the company/individual will have to contact Filmakademie
 #define BROADCASTHANDLER_H
 
 #include "zeroMQHandler.h"
+#include <iostream>
 #include <QMultiMap>
+
 
 class BroadcastHandler : public ZeroMQHandler
 {
@@ -46,13 +48,21 @@ public:
     //! 
     explicit BroadcastHandler(DataHub::Core* core, QString IPAdress = "", bool debug = false, bool parameterHistory = true, bool lockHistory = true, zmq::context_t* context = NULL);
 
+    //~BroadcastHandler()
+    //{
+    //    m_sender->close();
+    //}
+
 private:
 
     bool m_parameterHistory;
     bool m_lockHistory;
 
+    zmq::socket_t *m_sender;
+
     //! Mutex used for pausing the BroadcastHandler thread.
     QMutex m_pauseMutex;
+    QMutex m_messageListMutex;
 
     //! Wait condition used for pausing the BroadcastHandler thread.
     QWaitCondition* m_waitContition;
@@ -72,6 +82,9 @@ private:
     //! The map storing scene objects lock status. 
     QMultiMap<byte, QByteArray> m_lockMap;
 
+    // client | bundeles | bundle | more & message
+    QMap<byte, QList<QList<QPair<bool, QByteArray>>>> m_messageMap;
+
     //! 
     //! Helper function to convert characters to shorts. 
     //! 
@@ -85,6 +98,41 @@ private:
         return val;
     }
 
+    inline void QueMessage(QByteArray message, bool more)
+    {
+        m_messageListMutex.lock();
+        // CLIENT //
+        const byte clienID = message[0];
+        QList<QList<QPair<bool, QByteArray>>> &clientMessageBundles = m_messageMap[clienID];
+        //qDebug() << clientMessageBundles.size();
+        //qDebug() << more;
+        
+        // MESSAGE BUNDLES //
+        if (clientMessageBundles.isEmpty()) {
+            clientMessageBundles.append(
+                QList< QPair<bool, QByteArray> >( {QPair< bool, QByteArray >(more, message)} )
+            );
+        }
+		else {
+            QList<QPair<bool, QByteArray>> &lastMessageBundle = clientMessageBundles.last();
+
+			// MESSAGE //
+			//if last message in bundle has more tag
+            if (lastMessageBundle.last().first) {
+                lastMessageBundle.append(QPair<bool, QByteArray>(more, message));
+                //qDebug() << "more";
+            }
+            else {
+                clientMessageBundles.append(
+                    QList< QPair<bool, QByteArray> >({ QPair<bool, QByteArray>(more, message) })
+                );
+                //qDebug() << "not more";
+            }
+		}
+
+        m_messageListMutex.unlock();
+    }
+
 public:
     //!
     //! Function to broadcast a messagte to all connected clients.
@@ -92,6 +140,8 @@ public:
     //! @param message The message to be broadcasted. 
     //!
     void BroadcastMessage(QByteArray message);
+
+    void ClientLost(byte clientID);
 
     //!
     //! Function to get a reference to the Lock map.
@@ -111,12 +161,75 @@ public slots:
     //! The broadcast thread's main worker loop.
     //!
     void run();
+
+private slots:
     //!
     //! Slot to create a new sync message.
     //!
     //! @param time The current tracer time.
     //!
-    void createSyncMessage(int time);
+    inline void createSyncMessage(int time)
+    {
+        m_mutex.lock();
+        m_syncMessage[0] = m_targetHostID;
+        m_syncMessage[1] = time;
+        m_syncMessage[2] = MessageType::SYNC;
+        m_mutex.unlock();
+
+        std::cout << "\r" << "Time: " << time << " ";
+
+        m_waitContition->wakeOne();
+    }
+
+    inline void SendMessages()
+    {
+        m_mutex.lock();
+        m_messageListMutex.lock();
+
+        if (!m_messageMap.isEmpty())
+        {
+            for (auto clientIt = m_messageMap.begin(); clientIt != m_messageMap.end(); clientIt++)
+            {
+                for (auto bundlesIt = clientIt->begin(); bundlesIt != clientIt->end();)
+                {
+                    if (bundlesIt->last().first) {
+                        ++bundlesIt;
+                    }
+                    else {
+                        for (auto bundleIt = bundlesIt->begin(); bundleIt != bundlesIt->end(); bundleIt++)
+                            m_sender->send(bundleIt->second.data(), bundleIt->second.size(), bundleIt->first * ZMQ_SNDMORE);
+                        bundlesIt = clientIt->erase(bundlesIt);
+                        //bundlesIt->clear();
+                    }
+                }
+            }
+        }
+
+        //if (count > 0)
+        //{
+        //    if (count > 1)
+        //    {
+        //        for (int i = 0; i < count - 1; i++)
+        //        {
+        //            QByteArray message = m_messageQue[i];
+        //            m_sender->send(message.data(), message.size(), ZMQ_SNDMORE);
+        //        }
+        //        QByteArray message = m_messageQue.last();
+        //        m_sender->send(message.data(), message.size(), 0);
+        //    }
+        //    else
+        //    {
+        //        QByteArray message = m_messageQue[0];
+        //        m_sender->send(message.data(), message.size(), 0);
+        //    }
+        //    //for (int i = 0; i < count; i++)
+        //      //  m_messageQue[i].clear();
+        //    m_messageQue.clear();
+        //}
+
+        m_messageListMutex.unlock();
+        m_mutex.unlock();
+    }
 };
 
 

@@ -18,7 +18,7 @@ is limited to malice. DataHub may under no circumstances be used for racist,
 sexual or any illegal purposes. In all non-commercial productions, scientific
 publications, prototypical non-commercial software tools, etc. using the DataHub
 Filmakademie has to be named as follows: "DataHub by Filmakademie
-Baden-Württemberg, Animationsinstitut (http://research.animationsinstitut.de)".
+Baden-Wuerttemberg, Animationsinstitut (http://research.animationsinstitut.de)".
 
 In case a company or individual would like to use the Data Hub in a commercial
 surrounding or for commercial purposes, software based on these components or
@@ -31,8 +31,13 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include <QObject>
 #include <QMutex>
-#include <nzmqt/nzmqt.hpp>
+//#include <nzmqt/nzmqt.hpp>
+#include <zmq.hpp>
+//#include <zmq_addon.h>
+
 #include "core.h"
+
+typedef unsigned char byte;
 
 class ThreadBase : public QObject
 {

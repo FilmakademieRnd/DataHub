@@ -18,7 +18,7 @@ is limited to malice. DataHub may under no circumstances be used for racist,
 sexual or any illegal purposes. In all non-commercial productions, scientific
 publications, prototypical non-commercial software tools, etc. using the DataHub
 Filmakademie has to be named as follows: "DataHub by Filmakademie
-Baden-Württemberg, Animationsinstitut (http://research.animationsinstitut.de)".
+Baden-Wuerttemberg, Animationsinstitut (http://research.animationsinstitut.de)".
 
 In case a company or individual would like to use the Data Hub in a commercial
 surrounding or for commercial purposes, software based on these components or
@@ -28,25 +28,12 @@ any part thereof, the company/individual will have to contact Filmakademie
 */
 
 #include "BroadcastHandler.h"
-#include <iostream>
 
 BroadcastHandler::BroadcastHandler(DataHub::Core* core, QString IPAdress, bool debug, bool parameterHistory, bool lockHistory, zmq::context_t* context) : 
 									m_parameterHistory(parameterHistory), m_lockHistory(lockHistory), ZeroMQHandler(core, IPAdress, debug, context)
 {
 	connect(core, SIGNAL(tickSecondRandom(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
-}
-
-void BroadcastHandler::createSyncMessage(int time)
-{
-	m_mutex.lock();
-	m_syncMessage[0] = m_targetHostID;
-	m_syncMessage[1] = time;
-	m_syncMessage[2] = MessageType::SYNC;
-	m_mutex.unlock();
-
-	std::cout << "\r" << "Time: " << time << " ";
-
-	m_waitContition->wakeOne();
+	connect(core, SIGNAL(tickTick(int)), this, SLOT(SendMessages()), Qt::DirectConnection);
 }
 
 void BroadcastHandler::BroadcastMessage(QByteArray message)
@@ -56,6 +43,14 @@ void BroadcastHandler::BroadcastMessage(QByteArray message)
 	m_mutex.unlock();
 
 	m_waitContition->wakeOne();
+}
+
+void BroadcastHandler::ClientLost(byte clientID)
+{
+	m_messageListMutex.lock();
+	m_messageMap[clientID].clear();
+	m_messageMap.remove(clientID);
+	m_messageListMutex.unlock();
 }
 
 QMultiMap<byte, QByteArray> BroadcastHandler::GetLockMap()
@@ -69,8 +64,8 @@ void BroadcastHandler::run()
 	socket.bind(QString("tcp://" + m_IPadress + ":5557").toLatin1().data());
 	socket.setsockopt(ZMQ_SUBSCRIBE, "client", 0);
 
-	zmq::socket_t sender(*m_context, ZMQ_PUB);
-	sender.bind(QString("tcp://" + m_IPadress + ":5556").toLatin1().data());
+	m_sender = new zmq::socket_t(*m_context, ZMQ_PUB);
+	m_sender->bind(QString("tcp://" + m_IPadress + ":5556").toLatin1().data());
 
 	zmq::pollitem_t item = { static_cast<void*>(socket), 0, ZMQ_POLLIN, 0 };
 
@@ -107,26 +102,30 @@ void BroadcastHandler::run()
 		m_mutex.lock();
 		if (m_syncMessage[2] != MessageType::EMPTY)
 		{
-			sender.send(m_syncMessage, 3);
+			m_sender->send(m_syncMessage, 3);
 			m_syncMessage[2] = MessageType::EMPTY;
 		}
 		if (!m_broadcastMessage.isNull() && !m_broadcastMessage.isEmpty())
 		{
-			sender.send(m_broadcastMessage.constData(), static_cast<size_t>(m_broadcastMessage.length()));
+			m_sender->send(m_broadcastMessage.constData(), static_cast<size_t>(m_broadcastMessage.length()));
 			m_broadcastMessage.clear();
 		}
-		m_mutex.unlock();
 		
 		if (item.revents & ZMQ_POLLIN)
 		{
 			//try to receive a zeroMQ message
 			socket.recv(&message);
 		}
+		m_mutex.unlock();
 
 		//check if recv timed out
 		if (message.size() > 0)
 		{
-			QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
+			m_messageListMutex.lock();
+			//QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
+			QByteArray msgArray = QByteArray(static_cast<qsizetype>(message.size()), Qt::Uninitialized);
+			memcpy(msgArray.data(), message.data(), message.size());
+			m_messageListMutex.unlock();
 
 			const unsigned char clientID = msgArray[0];
 			// char time = msgArray[1];
@@ -137,7 +136,7 @@ void BroadcastHandler::run()
 
 			if (m_debug)
 			{
-				if (msgType == PARAMETERUPDATE)
+				if (msgType == RPC)
 				{
 					std::cout << "RPCMsg: ";
 					std::cout << "cID: " << (int)(char)msgArray[0] + 256 << " "; //ClientID
@@ -175,8 +174,9 @@ void BroadcastHandler::run()
 					}
 				}
 
-				message = zmq::message_t(newMessage.constData(), static_cast<size_t>(newMessage.length()));
-				sender.send(message);
+				//message = zmq::message_t(newMessage.constData(), static_cast<size_t>(newMessage.length()));
+				//m_sender->send(message);
+				QueMessage(newMessage, message.more());
 				break;
 			}
 			case MessageType::LOCK:
@@ -226,7 +226,8 @@ void BroadcastHandler::run()
 						std::cout << std::endl;
 					}
 				}
-				sender.send(message);
+				//m_sender->send(message);
+				QueMessage(msgArray, message.more());
 				break;
 			}
 			case MessageType::PARAMETERUPDATE:
@@ -241,14 +242,16 @@ void BroadcastHandler::run()
 						start += length;
 					}
 				}
-				sender.send(message);
+				//m_sender->send(message);
+				QueMessage(msgArray, message.more());
 				break;
 			}
 			case MessageType::UNDOREDOADD:
 			case MessageType::RESETOBJECT:
 			case MessageType::SYNC:
 			case MessageType::RPC:
-				sender.send(message);
+				//m_sender->send(message);
+				QueMessage(msgArray, message.more());
 				break;
 			}
 		}

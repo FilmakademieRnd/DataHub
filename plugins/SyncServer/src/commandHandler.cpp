@@ -18,7 +18,7 @@ is limited to malice. DataHub may under no circumstances be used for racist,
 sexual or any illegal purposes. In all non-commercial productions, scientific
 publications, prototypical non-commercial software tools, etc. using the DataHub
 Filmakademie has to be named as follows: "DataHub by Filmakademie
-Baden-Württemberg, Animationsinstitut (http://research.animationsinstitut.de)".
+Baden-Wuerttemberg, Animationsinstitut (http://research.animationsinstitut.de)".
 
 In case a company or individual would like to use the Data Hub in a commercial
 surrounding or for commercial purposes, software based on these components or
@@ -78,6 +78,7 @@ void CommandHandler::checkPingTimeouts()
 			//connection to client lost
 			byte clientID = m_pingMap.key(time);
 			m_pingMap.remove(clientID);
+			m_zmqHandler->ClientLost(clientID);
 
 			QByteArray newMessage((qsizetype)6, Qt::Uninitialized);
 			newMessage[0] = m_targetHostID;
@@ -159,7 +160,7 @@ void CommandHandler::run()
 				responseMsg[1] = m_core->m_time;
 				responseMsg[2] = BroadcastHandler::MessageType::PING;
 
-				Sleep(10);
+				QThread::msleep(10);
 				socket.send(responseMsg, 3);
 
 				m_mutex.lock();
