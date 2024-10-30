@@ -40,8 +40,8 @@ void BroadcastHandler::createSyncMessage(int time)
 {
 	m_mutex.lock();
 	m_syncMessage[0] = m_targetHostID;
-	m_syncMessage[1] = time;
-	m_syncMessage[2] = MessageType::SYNC;
+    m_syncMessage[1] = (std::byte)time;
+    m_syncMessage[2] = (std::byte)MessageType::SYNC;
 	m_mutex.unlock();
 
 	std::cout << "\r" << "Time: " << time << " ";
@@ -58,7 +58,7 @@ void BroadcastHandler::BroadcastMessage(QByteArray message)
 	m_waitContition->wakeOne();
 }
 
-QMultiMap<byte, QByteArray> BroadcastHandler::GetLockMap()
+QMultiMap<std::byte, QByteArray> BroadcastHandler::GetLockMap()
 {
 	return m_lockMap;
 }
@@ -105,10 +105,10 @@ void BroadcastHandler::run()
 		zmq::message_t message;
 
 		m_mutex.lock();
-		if (m_syncMessage[2] != MessageType::EMPTY)
+        if (m_syncMessage[2] != (std::byte)MessageType::EMPTY)
 		{
 			sender.send(m_syncMessage, 3);
-			m_syncMessage[2] = MessageType::EMPTY;
+            m_syncMessage[2] = (std::byte)MessageType::EMPTY;
 		}
 		if (!m_broadcastMessage.isNull() && !m_broadcastMessage.isEmpty())
 		{
@@ -157,7 +157,7 @@ void BroadcastHandler::run()
 				qInfo() << "RESENDING UPDATES";
 
 				QByteArray newMessage((qsizetype)3, Qt::Uninitialized);
-				newMessage[0] = m_targetHostID;
+                newMessage[0] = (char)m_targetHostID;
 				newMessage[1] = m_core->m_time;
 				newMessage[2] = MessageType::PARAMETERUPDATE;
 
@@ -184,14 +184,14 @@ void BroadcastHandler::run()
 				if (m_lockHistory)
 				{
 					//store locked object for each client
-					QList<QByteArray> lockedIDs = m_lockMap.values(clientID);
+                    QList<QByteArray> lockedIDs = m_lockMap.values((std::byte)clientID);
 					QByteArray newValue = msgArray.sliced(3, 3);
 
 					if (lockedIDs.isEmpty())
 					{
 						if (msgArray[6])
 						{
-							m_lockMap.insert(clientID, newValue);
+                            m_lockMap.insert((std::byte)clientID, newValue);
 						}
 					}
 					else
@@ -204,12 +204,12 @@ void BroadcastHandler::run()
 									std::cout << "Object " << 256 + (int)(char) msgArray[6] << "already locked!" << std::endl;
 							}
 							else
-								m_lockMap.insert(clientID, newValue);
+                                m_lockMap.insert((std::byte)clientID, newValue);
 						}
 						else
 						{
 							if (lockedIDs.contains(newValue))
-								m_lockMap.remove(clientID, newValue);
+                                m_lockMap.remove((std::byte)clientID, newValue);
 							else if (m_debug)
 								std::cout << "Unknown Lock release request from client: " << 256 + (int)clientID << std::endl;
 						}

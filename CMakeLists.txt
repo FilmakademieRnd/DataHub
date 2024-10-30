@@ -13,6 +13,10 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH "set install pre
 find_package(Qt6 REQUIRED COMPONENTS Core Network)
 qt_standard_project_setup()
 
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_OSX_ARCHITECTURES "x86_64")
+
+
 set_property (GLOBAL PROPERTY USE_FOLDERS ON) 
 
 set (i_targets DataHub)
@@ -22,22 +26,22 @@ add_subdirectory(plugins)
 add_subdirectory(application)
 
 install(TARGETS ${i_targets}
-		DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+                DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
 )
 
 install(TARGETS $ENV{i_plugin_targets} 
-		DESTINATION ${CMAKE_INSTALL_PREFIX}/bin/plugins
+                DESTINATION "${CMAKE_INSTALL_PREFIX}/bin/plugins"
 )
 
-qt_generate_deploy_app_script(
-    TARGET SyncServer
-    FILENAME_VARIABLE deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
+#qt_generate_deploy_app_script(
+#    TARGET SyncServer
+#    OUTPUT_SCRIPT deploy_script
+#    NO_UNSUPPORTED_PLATFORM_ERROR
 #	NO_TRANSLATIONS
-)
-install(SCRIPT ${deploy_script}
-	DESTINATION ${CMAKE_INSTALL_PREFIX}
-)
+#)
+#install(SCRIPT ${deploy_script}
+#        DESTINATION "${CMAKE_INSTALL_PREFIX"}
+#)
 
 
 

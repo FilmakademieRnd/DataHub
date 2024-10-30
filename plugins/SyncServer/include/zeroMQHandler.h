@@ -31,7 +31,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include <QObject>
 #include <QMutex>
-#include <nzmqt/nzmqt.hpp>
+#include <zmq.hpp>
 #include "core.h"
 
 class ThreadBase : public QObject
@@ -130,7 +130,7 @@ protected:
     bool m_debug;
 
     //! ID displayed as clientID for messages redistributed through syncServer.
-    byte m_targetHostID = 0;
+    std::byte m_targetHostID = (std::byte)0;
 
     //! ZeroMQ context.
     zmq::context_t* m_context;

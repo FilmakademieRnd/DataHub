@@ -36,12 +36,13 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include "core.h"
 #include <QPluginLoader>
 #include <cstdlib>
+#include <iostream>
 
 namespace DataHub {
 
     Core::Core()
     {
-        m_timesteps = (int)((s_timestepsBase / s_framerate) * s_framerate);
+        /*m_timesteps = (int)((s_timestepsBase / s_framerate) * s_framerate);
 
         TimerThread tthread(1000.f / s_framerate, false);
         TimerThread trandthread(1000.f, true);
@@ -53,7 +54,7 @@ namespace DataHub {
         tthread.setPriority(QThread::HighPriority);
         trandthread.setPriority(QThread::HighPriority);
 
-        loadPlugins();
+        loadPlugins();*/
     }
 
 	Core::Core(QStringList cmdlineArgs)
@@ -62,7 +63,7 @@ namespace DataHub {
        
         m_timesteps = (int)((s_timestepsBase / s_framerate) * s_framerate);
 
-        TimerThread tthread(1000.f / s_framerate, false);
+        /*TimerThread tthread(1000.f / s_framerate, false);
         TimerThread trandthread(1000.f, true);
 
         connect(&tthread, SIGNAL(tick()), this, SLOT(updateTime()), Qt::DirectConnection);
@@ -70,7 +71,7 @@ namespace DataHub {
         tthread.start();
         trandthread.start();
         tthread.setPriority(QThread::HighPriority);
-        trandthread.setPriority(QThread::HighPriority);
+        trandthread.setPriority(QThread::HighPriority);*/
 
         loadPlugins();
 	}
@@ -112,8 +113,10 @@ namespace DataHub {
     void Core::loadPlugins()
     {
         // search for plugins
-        QDir pluginsDir(QDir::currentPath() + "/plugins");
-        pluginsDir.setNameFilters(QStringList() << "*.dll");
+        std::cout  << "Plugin folder " << QCoreApplication::applicationDirPath().toStdString() << std::endl;
+
+        QDir pluginsDir(QCoreApplication::applicationDirPath() + "/plugins");
+        pluginsDir.setNameFilters(QStringList() << "*.dylib");
 
         const QStringList entries = pluginsDir.entryList();
 
@@ -126,8 +129,8 @@ namespace DataHub {
                 if (pluginInterface)
                 {
                     s_plugins.insert(pluginInterface->name(), pluginInterface);
-                    // init plugin
-                    qDebug() << "Plugin " + filePath + " loaded.";
+                    // init plugin                    
+                    std::cout  << "Plugin " << filePath.toStdString() << " loaded." << std::endl;
                     pluginInterface->setCore(this);
                     pluginInterface->init();
                     pluginInterface->run();

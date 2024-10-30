@@ -18,7 +18,7 @@ is limited to malice. DataHub may under no circumstances be used for racist,
 sexual or any illegal purposes. In all non-commercial productions, scientific
 publications, prototypical non-commercial software tools, etc. using the DataHub
 Filmakademie has to be named as follows: "DataHub by Filmakademie
-Baden-Württemberg, Animationsinstitut (http://research.animationsinstitut.de)".
+Baden-W?rttemberg, Animationsinstitut (http://research.animationsinstitut.de)".
 
 In case a company or individual would like to use the Data Hub in a commercial
 surrounding or for commercial purposes, software based on these components or
@@ -28,7 +28,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 */
 
 //! @file "DataHub.cpp"
-//! @brief DataHub executable application implementation. 
+//! @brief DataHub executable application implementation.
 //! @author Simon Spielmann
 //! @version 1
 //! @date 03.07.2023
@@ -37,6 +37,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include <QDebug>
 #include <csignal>
 #include "core.h"
+#include "iostream"
 
 using namespace std;
 using namespace DataHub;
@@ -45,9 +46,9 @@ using namespace DataHub;
 int main(int argc, char** argv)
 {
     QCoreApplication a(argc, argv);
-	QStringList cmdlineArgs = QCoreApplication::arguments();
+    QStringList cmdlineArgs = QCoreApplication::arguments();
 
-	Core core(cmdlineArgs);
+    Core core(cmdlineArgs);
 
-	return a.exec();
+    return a.exec();
 }

@@ -42,7 +42,7 @@ void CommandHandler::tickTime(int time)
 	checkPingTimeouts();
 }
 
-void CommandHandler::updatePingTimeouts(byte clientID)
+void CommandHandler::updatePingTimeouts(std::byte clientID)
 {
 	//update ping timeout
 	auto client = m_pingMap.find(clientID);
@@ -55,16 +55,16 @@ void CommandHandler::updatePingTimeouts(byte clientID)
 		m_pingMap.insert(clientID, m_time);
 
 		QByteArray newMessage((qsizetype)6, Qt::Uninitialized);
-		newMessage[0] = m_targetHostID;
+        newMessage[0] = (char)m_targetHostID;
 		newMessage[1] = m_core->m_time;
 		newMessage[2] = BroadcastHandler::MessageType::DATAHUB;
 		newMessage[3] = 0; // data hub type 0 = connection status update
 		newMessage[4] = 1; // new client registered
-		newMessage[5] = clientID; // new client ID
+        newMessage[5] = (char)clientID; // new client ID
 
 		m_zmqHandler->BroadcastMessage(newMessage);
 
-		qInfo() << "New client registered:" << clientID;
+        qInfo() << "New client registered:" << (int)clientID;
 	}
 }
 
@@ -76,20 +76,20 @@ void CommandHandler::checkPingTimeouts()
 		if (m_time - time > m_pingTimeout)
 		{
 			//connection to client lost
-			byte clientID = m_pingMap.key(time);
+            std::byte clientID = m_pingMap.key(time);
 			m_pingMap.remove(clientID);
 
 			QByteArray newMessage((qsizetype)6, Qt::Uninitialized);
-			newMessage[0] = m_targetHostID;
+            newMessage[0] = (char)m_targetHostID;
 			newMessage[1] = m_core->m_time;
 			newMessage[2] = BroadcastHandler::MessageType::DATAHUB;
 			newMessage[3] = 0; // data hub type 0 = connection status update
 			newMessage[4] = 0; // client lost
-			newMessage[5] = clientID; // new client ID
+            newMessage[5] = (char)clientID; // new client ID
 
 			m_zmqHandler->BroadcastMessage(newMessage);
 
-			qInfo().nospace() << "Lost connection to client:" << clientID;
+            qInfo().nospace() << "Lost connection to client:" << (int)clientID;
 
 			//check if client had lock
 			m_mutex.lock();
@@ -146,20 +146,20 @@ void CommandHandler::run()
 		{
 			QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
 
-			byte clientID = msgArray[0];
-			byte msgTime = msgArray[1];
-			byte msgType = msgArray[2];
+            std::byte clientID = (std::byte)msgArray[0];
+            std::byte msgTime = (std::byte)msgArray[1];
+            std::byte msgType = (std::byte)msgArray[2];
 
 			switch (msgType)
 			{
-			case BroadcastHandler::MessageType::PING:
+            case (std::byte)BroadcastHandler::MessageType::PING:
 			{
 				char responseMsg[3];
-				responseMsg[0] = m_targetHostID;
+                responseMsg[0] = (char)m_targetHostID;
 				responseMsg[1] = m_core->m_time;
 				responseMsg[2] = BroadcastHandler::MessageType::PING;
 
-				Sleep(10);
+                QThread::msleep(10);
 				socket.send(responseMsg, 3);
 
 				m_mutex.lock();
@@ -168,7 +168,7 @@ void CommandHandler::run()
 
 				break;
 			}
-			case BroadcastHandler::MessageType::DATAHUB:
+            case (std::byte)BroadcastHandler::MessageType::DATAHUB:
 			{
 				// ...
 				break;

@@ -57,10 +57,10 @@ private:
     BroadcastHandler* m_zmqHandler;
 
     //! The map storing the registered clients ping times.
-    QMap<byte, unsigned int> m_pingMap;
+    QMap<std::byte, unsigned int> m_pingMap;
 
 private:
-    void updatePingTimeouts(byte clientID);
+    void updatePingTimeouts(std::byte clientID);
     void checkPingTimeouts();
 signals:
     //signal emitted when process is finished

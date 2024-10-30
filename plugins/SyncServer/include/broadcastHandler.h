@@ -61,7 +61,7 @@ private:
     QThread* m_zeroMQPollerThread;
 
     //! Buffer used for broadcasting sync messages.
-    byte m_syncMessage[3] = { m_targetHostID,0,MessageType::EMPTY };
+    std::byte m_syncMessage[3] = { m_targetHostID,(std::byte)0,(std::byte)MessageType::EMPTY };
 
     //! Buffer used for broadcasting general purpose messages.
     QByteArray m_broadcastMessage;
@@ -70,7 +70,7 @@ private:
     QMap<QByteArray, QByteArray> m_objectStateMap;
 
     //! The map storing scene objects lock status. 
-    QMultiMap<byte, QByteArray> m_lockMap;
+    QMultiMap<std::byte, QByteArray> m_lockMap;
 
     //! 
     //! Helper function to convert characters to shorts. 
@@ -98,7 +98,7 @@ public:
     //!
     //! @return The reference to the lockMap.
     //!
-    QMultiMap<byte, QByteArray> GetLockMap();
+    QMultiMap<std::byte, QByteArray> GetLockMap();
 
 signals:
     //!
