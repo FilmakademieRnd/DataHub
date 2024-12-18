@@ -43,7 +43,7 @@ void CommandHandler::tickTime(int time)
 	checkPingTimeouts();
 }
 
-void CommandHandler::updatePingTimeouts(byte clientID)
+void CommandHandler::updatePingTimeouts(byte clientID, bool isServer)
 {
 	//update ping timeout
 	m_mutex.lock();
@@ -56,7 +56,7 @@ void CommandHandler::updatePingTimeouts(byte clientID)
 	{
 		m_pingMap.insert(clientID, m_time);
 
-		char newMessage[6];
+		char newMessage[7];
 
 		newMessage[0] = m_targetHostID;
 		newMessage[1] = m_core->m_time;
@@ -64,8 +64,9 @@ void CommandHandler::updatePingTimeouts(byte clientID)
 		newMessage[3] = 0; // data hub type 0 = connection status update
 		newMessage[4] = 1; // new client registered
 		newMessage[5] = clientID; // new client ID
+		newMessage[6] = isServer; // is the new client a server
 
-		m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 6)));
+		m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 7)));
 
 		qInfo() << "New client registered:" << clientID;
 	}
@@ -84,7 +85,7 @@ void CommandHandler::checkPingTimeouts()
 			byte clientID = m_pingMap.key(time);
 			m_pingMap.remove(clientID);
 
-			char newMessage[6];
+			char newMessage[7];
 
 			newMessage[0] = m_targetHostID;
 			newMessage[1] = m_core->m_time;
@@ -92,8 +93,9 @@ void CommandHandler::checkPingTimeouts()
 			newMessage[3] = 0; // data hub type 0 = connection status update
 			newMessage[4] = 0; // client lost
 			newMessage[5] = clientID; // new client ID
+			newMessage[6] = false; // always false
 
-			m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 6)));
+			m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 7)));
 
 			qInfo().nospace() << "Lost connection to client:" << clientID;
 
@@ -129,6 +131,7 @@ void CommandHandler::run()
 			byte clientID = msgArray[0];
 			byte msgTime = msgArray[1];
 			byte msgType = msgArray[2];
+			byte msgServer = msgArray[3];
 
 			switch (msgType)
 			{
@@ -142,7 +145,7 @@ void CommandHandler::run()
 				QThread::msleep(10);
 				socket.send(responseMsg, 3);
 
-				updatePingTimeouts(clientID);
+				updatePingTimeouts(clientID, msgServer);
 
 				break;
 			}

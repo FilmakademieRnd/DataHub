@@ -63,7 +63,7 @@ private:
     QMap<byte, unsigned int> m_pingMap;
 
 private:
-    void updatePingTimeouts(byte clientID);
+    void updatePingTimeouts(byte clientID, bool isServer);
     void checkPingTimeouts();
 signals:
     //signal emitted when process is finished
