@@ -31,33 +31,104 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include <QObject>
 #include <QMutex>
-//#include <nzmqt/nzmqt.hpp>
 #include <zmq.hpp>
-//#include <zmq_addon.h>
+#include <zmq_addon.hpp>
 
 #include "core.h"
 
 typedef unsigned char byte;
 
-class ThreadBase : public QObject
+
+class ZeroMQHandler : public QObject
 {
     Q_OBJECT
-
 public:
-    //! 
+	//! 
     //! Constructor
     //! 
     //! @param core A reference to the DataHub core.
+    //! @param IPAdress The IP adress the BroadcastHandler shall connect to. 
+    //! @param debug Flag determin wether debug informations shall be printed.
+    //! @param context The ZMQ context used by the BroadcastHandler.
     //! 
-    explicit ThreadBase(DataHub::Core* core);
+    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress, bool debug, zmq::context_t* context) : m_core(core), m_IPadress(IPAdress), m_debug(debug), m_context(context) 
+    {
+        m_stop = false;
+        m_working = false;
+    }
 
+	//! Tracer message types.
+	enum MessageType
+    {
+        PARAMETERUPDATE, LOCK, // node
+        SYNC, PING, RESENDUPDATE, // sync
+        UNDOREDOADD, RESETOBJECT, // undo redo
+        DATAHUB, // DataHub
+        RPC, // RPC
+        EMPTY = 255
+    };
+
+    //! 
+    //! Helper function to convert characters to shorts. 
+    //! 
+    //! @param buf The char buffer to be converted.
+    //! @return The converted and copyed buffer as short.
+    //! 
+    static inline const short CharToShort(const char* buf) 
+    {
+        short val;
+        std::memcpy(&val, buf, 2);
+        return val;
+    }
+
+    //! 
+    //! Helper function to convert characters to integer. 
+    //! 
+    //! @param buf The char buffer to be converted.
+    //! @return The converted and copyed buffer as integer.
+    //! 
+    static inline const int CharToInt(const char* buf) 
+    {
+        int val;
+        std::memcpy(&val, buf, 4);
+        return val;
+    }
+
+public:
     //! Request this process to start working.
-    virtual void requestStart();
+    void requestStart()
+    {
+        m_mutex.lock();
+        m_working = true;
+        m_stop = false;
+        qInfo() << metaObject()->className() << " requested to start";
+        m_mutex.unlock();
+    }
 
     //! Request this process to stop working.
-    virtual void requestStop();
+    void requestStop()
+    {
+        m_mutex.lock();
+        if (m_working) {
+            m_stop = true;
+            qInfo() << metaObject()->className() << " stopping";
+        }
+        m_mutex.unlock();
+    }
 
 protected:
+    //! Shall debug messages be printed.
+    bool m_debug;
+
+    //! ID displayed as clientID for messages redistributed through syncServer.
+    byte m_targetHostID = 0;
+
+    //! ZeroMQ context.
+    zmq::context_t* m_context;
+
+    //! The server IP adress.
+    QString m_IPadress;
+
     //! Default mutex used to lock the thread.
     QMutex m_mutex;
 
@@ -79,88 +150,6 @@ signals:
 public slots:
     //! Default thread worker loop.
     virtual void run() = 0;
-};
-
-class BroadcastPoller : public ThreadBase
-{
-    Q_OBJECT
-public:
-    //! 
-    //! Constructor
-    //! 
-    //! @param core A reference to the DataHub core.
-    //! @param item A reference to the ZMQ polling intem.
-    //! @param waitCondition A reference to the wait condition for pausing the broadcast thread.
-    explicit BroadcastPoller(DataHub::Core* core, zmq::pollitem_t* item, QWaitCondition* waitCondition) : ThreadBase(core), m_item(item), m_waitCondition(waitCondition) {}
-
-public slots:
-    //! Default thread worker loop.
-    void run();
-
-private:
-    //! A reference to the zmq poller.
-    zmq::pollitem_t *m_item;
-    
-    //! A reference to shared mutex for pausing the broadcast thread.
-    QWaitCondition *m_waitCondition;
-};
-
-class ZeroMQHandler : public ThreadBase
-{
-    Q_OBJECT
-public:
-	//! 
-    //! Constructor
-    //! 
-    //! @param core A reference to the DataHub core.
-    //! @param IPAdress The IP adress the BroadcastHandler shall connect to. 
-    //! @param debug Flag determin wether debug informations shall be printed.
-    //! @param context The ZMQ context used by the BroadcastHandler.
-    //! 
-    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress, bool debug, zmq::context_t* context) : ThreadBase(core), m_IPadress(IPAdress), m_debug(debug), m_context(context) {}
-
-	//! Tracer message types.
-	enum MessageType
-    {
-        PARAMETERUPDATE, LOCK, // node
-        SYNC, PING, RESENDUPDATE, // sync
-        UNDOREDOADD, RESETOBJECT, // undo redo
-        DATAHUB, // DataHub
-        RPC, // RPC
-        EMPTY = 255
-    };
-
-protected:
-    //! Shall debug messages be printed.
-    bool m_debug;
-
-    //! ID displayed as clientID for messages redistributed through syncServer.
-    byte m_targetHostID = 0;
-
-    //! ZeroMQ context.
-    zmq::context_t* m_context;
-
-    //! The server IP adress.
-    QString m_IPadress;
-
-    //! 
-    //! Helper function to convert characters to shorts. 
-    //! 
-    //! @param buf The char buffer to be converted.
-    //! @return The converted and copyed buffer as short.
-    //! 
-    inline const short CharToShort(const char* buf) const
-    {
-        short val;
-        std::memcpy(&val, buf, 2);
-        return val;
-    }
-
-signals:
-    //!
-    //! Signal emitted when process is finished.
-    //!
-    void stopped();
 };
 
 

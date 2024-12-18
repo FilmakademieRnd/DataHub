@@ -102,8 +102,8 @@ namespace DataHub {
         if ((m_time % s_framerate) == 0) 
             emit tickSecond(m_time);
 
-        //if ((m_time % 2) == 0)
-          //  emit tickHalf(m_time);
+        if ((m_time % 4) == 0)
+            emit tickHalf(m_time);
 	}
 
     //!

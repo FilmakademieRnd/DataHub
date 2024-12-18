@@ -27,63 +27,43 @@ any part thereof, the company/individual will have to contact Filmakademie
 -----------------------------------------------------------------------------
 */
 
-#include "zeroMQHandler.h"
+//! @file "MessageRecorder.h"
+//! @brief Datahub Plugin: Sync Server defines the network bridge between TRACER clients and servers.
+//! @author Simon Spielmann
+//! @version 1
+//! @date 03.07.2023
 
-#include <QDebug>
+#ifndef MESSAGERECORDER_H
+#define MESSAGERECORDER_H
 
-ThreadBase::ThreadBase(DataHub::Core* core) : m_core(core)
-{
-	m_stop = false;
-	m_working = false;
+#include <QThread>
+#include <QMutex>
+#include "plugininterface.h"
+
+
+namespace DataHub {
+	
+	class PLUGININTERFACESHARED_EXPORT MessageRecorder : public PluginInterface
+	{
+		Q_OBJECT
+		Q_PLUGIN_METADATA(IID "de.datahub.PluginInterface" FILE "metadata.json")
+		Q_INTERFACES(DataHub::PluginInterface)
+
+	public:
+		MessageRecorder() { }
+	
+	public:
+		virtual void run();
+		virtual void stop();
+
+	protected:
+		void init();
+
+	private slots:
+		void RecordDataSlot(QByteArray data);
+
+	};
+
 }
 
-void ThreadBase::requestStart()
-{
-	m_mutex.lock();
-	m_working = true;
-	m_stop = false;
-	qInfo() << metaObject()->className() << " requested to start"; 
-	m_mutex.unlock();
-}
-
-void ThreadBase::requestStop()
-{
-	m_mutex.lock();
-	if (m_working) {
-		m_stop = true;
-		qInfo() << metaObject()->className() << " stopping"; 
-	}
-	m_mutex.unlock();
-}
-
-void BroadcastPoller::run()
-{
-	while (true) {
-		// checks if process should be aborted
-		m_mutex.lock();
-
-		bool stop = m_stop;
-
-		//try to receive a zeroMQ message
-		zmq::poll(m_item, 1, -1);
-
-		//if (m_item->revents & ZMQ_POLLIN)
-			m_waitCondition->wakeOne();
-
-		m_mutex.unlock();
-
-		if (stop) {
-			qDebug() << "Stopping " << metaObject()->className();
-			break;
-		}
-
-		QThread::yieldCurrentThread();
-	}
-
-	// Set _working to false -> process cannot be aborted anymore
-	m_mutex.lock();
-	m_working = false;
-	m_mutex.unlock();
-
-	qDebug() << metaObject()->className() << " process stopped"; // in Thread " << thread()->currentThreadId();
-}
+#endif //MESSAGERECORDER_H

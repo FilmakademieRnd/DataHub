@@ -27,58 +27,52 @@ any part thereof, the company/individual will have to contact Filmakademie
 -----------------------------------------------------------------------------
 */
 
-#include "BroadcastHandler.h"
+#include "messageReceiver.h"
+#include <iostream>
 
-BroadcastHandler::BroadcastHandler(DataHub::Core* core, QString IPAdress, bool debug, bool parameterHistory, bool lockHistory, zmq::context_t* context) : 
-									m_parameterHistory(parameterHistory), m_lockHistory(lockHistory), ZeroMQHandler(core, IPAdress, debug, context)
+MessageReceiver::MessageReceiver(DataHub::Core* core, MessageSender* messageSender, QString IPAdress, bool debug, bool parameterHistory, bool lockHistory, zmq::context_t* context) :
+									m_sender(messageSender), m_parameterHistory(parameterHistory), m_lockHistory(lockHistory), ZeroMQHandler(core, IPAdress, debug, context)
 {
-	connect(core, SIGNAL(tickSecondRandom(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
-	connect(core, SIGNAL(tickTick(int)), this, SLOT(SendMessages()), Qt::DirectConnection);
 }
 
-void BroadcastHandler::BroadcastMessage(QByteArray message)
+void MessageReceiver::CheckLocks(byte clientID)
 {
-	m_mutex.lock();
-	m_broadcastMessage = message;
-	m_mutex.unlock();
+	//check if client had lock
+	m_lockMapMutex.lock();
+	QList<QByteArray> values = m_lockMap.values(clientID);
 
-	m_waitContition->wakeOne();
+	if (!values.isEmpty())
+	{
+		//release lock
+		qInfo() << "Resetting locks!";
+		char lockReleaseMsg[7];
+		for (int i = 0; i < values.count(); i++)
+		{
+			const char* value = values[i].constData();
+			lockReleaseMsg[0] = static_cast<char>(m_targetHostID);
+			lockReleaseMsg[1] = static_cast<char>(m_core->m_time);  // time
+			lockReleaseMsg[2] = static_cast<char>(MessageReceiver::MessageType::LOCK);
+			lockReleaseMsg[3] = value[0]; // sID
+			//memcpy(lockReleaseMsg + 4, value + 1, 2);
+			lockReleaseMsg[4] = value[1]; // oID part1
+			lockReleaseMsg[5] = value[2]; // oID part2
+			lockReleaseMsg[6] = static_cast<char>(false);
+
+			m_sender->QueBroadcastMessage(std::move(zmq::message_t(lockReleaseMsg, 7)));
+			m_lockMap.remove(clientID);
+		}
+	}
+	m_lockMapMutex.unlock();
 }
 
-void BroadcastHandler::ClientLost(byte clientID)
-{
-	m_messageListMutex.lock();
-	m_messageMap[clientID].clear();
-	m_messageMap.remove(clientID);
-	m_messageListMutex.unlock();
-}
 
-QMultiMap<byte, QByteArray> BroadcastHandler::GetLockMap()
-{
-	return m_lockMap;
-}
-
-void BroadcastHandler::run()
+void MessageReceiver::run()
 {
 	zmq::socket_t socket(*m_context, ZMQ_SUB);
 	socket.bind(QString("tcp://" + m_IPadress + ":5557").toLatin1().data());
 	socket.setsockopt(ZMQ_SUBSCRIBE, "client", 0);
 
-	m_sender = new zmq::socket_t(*m_context, ZMQ_PUB);
-	m_sender->bind(QString("tcp://" + m_IPadress + ":5556").toLatin1().data());
-
 	zmq::pollitem_t item = { static_cast<void*>(socket), 0, ZMQ_POLLIN, 0 };
-
-	m_waitContition = new QWaitCondition();
-	BroadcastPoller zeroMQPoller(BroadcastPoller(m_core, &item, m_waitContition));
-
-	m_zeroMQPollerThread = new QThread(this);
-	zeroMQPoller.moveToThread(m_zeroMQPollerThread);
-
-	QObject::connect(m_zeroMQPollerThread, &QThread::started, &zeroMQPoller, &BroadcastPoller::run);
-
-	m_zeroMQPollerThread->start();
-	zeroMQPoller.requestStart();
 
 	qDebug() << "Starting " << metaObject()->className();
 
@@ -87,45 +81,18 @@ void BroadcastHandler::run()
 		// checks if process should be aborted
 		m_mutex.lock();
 		bool stop = m_stop;
-		m_mutex.unlock();
-
-		m_pauseMutex.lock();
-		m_waitContition->wait(&m_pauseMutex);
-
-		//qDebug() << "Thread woked up!";
+		
+		zmq::multipart_t messages;
 
 		//try to receive a zeroMQ message
-		//zmq::poll(&item, 1, -1);
-
-		zmq::message_t message;
-
-		m_mutex.lock();
-		if (m_syncMessage[2] != MessageType::EMPTY)
-		{
-			m_sender->send(m_syncMessage, 3);
-			m_syncMessage[2] = MessageType::EMPTY;
-		}
-		if (!m_broadcastMessage.isNull() && !m_broadcastMessage.isEmpty())
-		{
-			m_sender->send(m_broadcastMessage.constData(), static_cast<size_t>(m_broadcastMessage.length()));
-			m_broadcastMessage.clear();
-		}
-		
-		if (item.revents & ZMQ_POLLIN)
-		{
-			//try to receive a zeroMQ message
-			socket.recv(&message);
-		}
+		zmq::recv_multipart(socket, std::back_inserter(messages), zmq::recv_flags::none);
 		m_mutex.unlock();
 
-		//check if recv timed out
-		if (message.size() > 0)
+		for (auto messageIter = messages.begin(); messageIter != messages.end(); messageIter++)
 		{
-			m_messageListMutex.lock();
-			//QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
-			QByteArray msgArray = QByteArray(static_cast<qsizetype>(message.size()), Qt::Uninitialized);
-			memcpy(msgArray.data(), message.data(), message.size());
-			m_messageListMutex.unlock();
+			QByteArray msgArray = QByteArray((char*)messageIter->data(), static_cast<int>(messageIter->size()));
+			//QByteArray msgArray = QByteArray(static_cast<qsizetype>(messageIter->size()), Qt::Uninitialized);
+			//memcpy(msgArray.data(), messageIter->data(), messageIter->size());
 
 			const unsigned char clientID = msgArray[0];
 			// char time = msgArray[1];
@@ -174,15 +141,14 @@ void BroadcastHandler::run()
 					}
 				}
 
-				//message = zmq::message_t(newMessage.constData(), static_cast<size_t>(newMessage.length()));
-				//m_sender->send(message);
-				QueMessage(newMessage, message.more());
+				m_sender->QueMessage(std::move(zmq::message_t(newMessage.data(), newMessage.size())));
 				break;
 			}
 			case MessageType::LOCK:
 			{
 				if (m_lockHistory)
 				{
+					m_lockMapMutex.lock();
 					//store locked object for each client
 					QList<QByteArray> lockedIDs = m_lockMap.values(clientID);
 					QByteArray newValue = msgArray.sliced(3, 3);
@@ -201,7 +167,7 @@ void BroadcastHandler::run()
 							if (lockedIDs.contains(newValue))
 							{
 								if (m_debug)
-									std::cout << "Object " << 256 + (int)(char) msgArray[6] << "already locked!" << std::endl;
+									std::cout << "Object " << 256 + (int)(char)msgArray[6] << "already locked!" << std::endl;
 							}
 							else
 								m_lockMap.insert(clientID, newValue);
@@ -214,6 +180,7 @@ void BroadcastHandler::run()
 								std::cout << "Unknown Lock release request from client: " << 256 + (int)clientID << std::endl;
 						}
 					}
+					m_lockMapMutex.unlock();
 
 					if (m_debug)
 					{
@@ -226,8 +193,7 @@ void BroadcastHandler::run()
 						std::cout << std::endl;
 					}
 				}
-				//m_sender->send(message);
-				QueMessage(msgArray, message.more());
+				m_sender->QueMessage(std::move(*messageIter));
 				break;
 			}
 			case MessageType::PARAMETERUPDATE:
@@ -237,21 +203,22 @@ void BroadcastHandler::run()
 					int start = 3;
 					while (start < msgArray.size())
 					{
-						const int length = msgArray[start + 6];
-						m_objectStateMap.insert(msgArray.sliced(start, 5), msgArray.sliced(start, length));
+						const int length = CharToInt(msgArray.sliced(start + 6, 4));
+						
+						if (!m_objectStateMap.contains(msgArray.sliced(start, 5)))
+							m_objectStateMap.insert(msgArray.sliced(start, 5), msgArray.sliced(start, length));
+						
 						start += length;
 					}
 				}
-				//m_sender->send(message);
-				QueMessage(msgArray, message.more());
+				m_sender->QueMessage(std::move(*messageIter));
 				break;
 			}
+			case MessageType::SYNC:
 			case MessageType::UNDOREDOADD:
 			case MessageType::RESETOBJECT:
-			case MessageType::SYNC:
 			case MessageType::RPC:
-				//m_sender->send(message);
-				QueMessage(msgArray, message.more());
+				m_sender->QueMessage(std::move(*messageIter));
 				break;
 			}
 		}
@@ -260,13 +227,9 @@ void BroadcastHandler::run()
 			qDebug() << "Stopping " << metaObject()->className();
 			break;
 		}
-		m_pauseMutex.unlock();
 
 		QThread::yieldCurrentThread();
 	}
-
-	zeroMQPoller.requestStop();
-	m_zeroMQPollerThread->exit();
 
 	// Set _working to false -> process cannot be aborted anymore
 	m_mutex.lock();

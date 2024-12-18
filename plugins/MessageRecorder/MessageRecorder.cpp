@@ -27,55 +27,39 @@ any part thereof, the company/individual will have to contact Filmakademie
 -----------------------------------------------------------------------------
 */
 
-//! @file "SyncServer.h"
+//! @file "SyncServer.cpp"
 //! @brief Datahub Plugin: Sync Server defines the network bridge between TRACER clients and servers.
 //! @author Simon Spielmann
 //! @version 1
 //! @date 03.07.2023
 
-#ifndef SYNCSERVER_H
-#define SYNCSERVER_H
-
-#include <QThread>
-#include <QMutex>
-#include "plugininterface.h"
-#include "commandHandler.h"
+#include "MessageRecorder.h"
+#include <iostream>
+#include "core.h"
 
 
 namespace DataHub {
-	
-	class PLUGININTERFACESHARED_EXPORT SyncServer : public PluginInterface
+
+    void MessageRecorder::init()
+    {
+        QObject::connect(core(), &Core::storeDataSignal, this, &MessageRecorder::RecordDataSlot);
+    }
+
+	void MessageRecorder::run()
 	{
-		Q_OBJECT
-		Q_PLUGIN_METADATA(IID "de.datahub.PluginInterface" FILE "metadata.json")
-		Q_INTERFACES(DataHub::PluginInterface)
 
-	public:
-		SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_messageReceiver(0), m_messageReceiverThread(0) { }
-	
-	public:
-		virtual void run();
-		virtual void stop();
+	}
 
-	private:
-		QString m_ownIP;
-		bool m_debug;
-		bool m_lockHistory;
-		bool m_paramHistory;
-		zmq::context_t *m_context;
-		QThread* m_messageReceiverThread;
-		QThread* m_messageSenderThread;
-		QThread* m_commandHandlerThread;
-		MessageReceiver* m_messageReceiver;
-		MessageSender* m_messageSender;
-		CommandHandler* m_commandHandler;
-	protected:
-		void init();
-	private:
-		void InitServer();
-		void printHelp();
-	};
+    void MessageRecorder::stop()
+    {
+       
+    }
+
+    void MessageRecorder::RecordDataSlot(QByteArray data)
+    {
+
+    }
+
+
 
 }
-
-#endif //SYNCSERVER_H

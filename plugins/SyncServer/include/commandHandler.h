@@ -29,7 +29,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 #ifndef COMMANDHANDLER_H
 #define COMMANDHANDLER_H
 
-#include "broadcastHandler.h"
+#include "messageReceiver.h"
 
 class CommandHandler : public ZeroMQHandler
 {
@@ -44,7 +44,7 @@ public:
     //! @param debug Flag determin wether debug informations shall be printed.
     //! @param context The ZMQ context used by the CommandHandler.
     //! 
-    explicit CommandHandler(DataHub::Core* core, BroadcastHandler* broadcastHandler, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
+    explicit CommandHandler(DataHub::Core* core, MessageSender* messageSender, MessageReceiver* messageReceiver, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
 
 private:
     //! The global timeout for tracer clients.
@@ -53,8 +53,11 @@ private:
     //! The local elapsed time in seconds since object has been created.
     unsigned int m_time = 0;
 
-    //! A reference to the zeroMQHandler. 
-    BroadcastHandler* m_zmqHandler;
+    //! A reference to the message sender. 
+    MessageSender* m_sender;
+
+    //! A reference to the message receiver. 
+    MessageReceiver* m_receiver;
 
     //! The map storing the registered clients ping times.
     QMap<byte, unsigned int> m_pingMap;

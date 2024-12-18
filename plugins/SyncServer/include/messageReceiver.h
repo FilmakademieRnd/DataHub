@@ -26,56 +26,66 @@ any part thereof, the company/individual will have to contact Filmakademie
 (research<at>filmakademie.de) for an individual license agreement.
 -----------------------------------------------------------------------------
 */
+#ifndef MESSAGERECEIVER_H
+#define MESSAGERECEIVER_H
 
-//! @file "SyncServer.h"
-//! @brief Datahub Plugin: Sync Server defines the network bridge between TRACER clients and servers.
-//! @author Simon Spielmann
-//! @version 1
-//! @date 03.07.2023
-
-#ifndef SYNCSERVER_H
-#define SYNCSERVER_H
-
-#include <QThread>
-#include <QMutex>
-#include "plugininterface.h"
-#include "commandHandler.h"
+#include "zeroMQHandler.h"
+#include "messageSender.h"
+#include <QMultiMap>
 
 
-namespace DataHub {
-	
-	class PLUGININTERFACESHARED_EXPORT SyncServer : public PluginInterface
-	{
-		Q_OBJECT
-		Q_PLUGIN_METADATA(IID "de.datahub.PluginInterface" FILE "metadata.json")
-		Q_INTERFACES(DataHub::PluginInterface)
+class MessageReceiver : public ZeroMQHandler
+{
+    Q_OBJECT
+public:
+    //! 
+    //! Constructor
+    //! 
+    //! @param core A reference to the DataHub core.
+    //! @param IPAdress The IP adress the BroadcastHandler shall connect to. 
+    //! @param debug Flag determin wether debug informations shall be printed.
+    //! @param context The ZMQ context used by the BroadcastHandler.
+    //! 
+    explicit MessageReceiver(DataHub::Core* core, MessageSender* messageSender, QString IPAdress = "", bool debug = false, bool parameterHistory = true, bool lockHistory = true, zmq::context_t* context = NULL);
 
-	public:
-		SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_messageReceiver(0), m_messageReceiverThread(0) { }
-	
-	public:
-		virtual void run();
-		virtual void stop();
+    ~MessageReceiver()
+    {    }
 
-	private:
-		QString m_ownIP;
-		bool m_debug;
-		bool m_lockHistory;
-		bool m_paramHistory;
-		zmq::context_t *m_context;
-		QThread* m_messageReceiverThread;
-		QThread* m_messageSenderThread;
-		QThread* m_commandHandlerThread;
-		MessageReceiver* m_messageReceiver;
-		MessageSender* m_messageSender;
-		CommandHandler* m_commandHandler;
-	protected:
-		void init();
-	private:
-		void InitServer();
-		void printHelp();
-	};
+private:
+    bool m_parameterHistory;
+    bool m_lockHistory;
 
-}
+    //! Default mutex used to lock the thread.
+    QMutex m_lockMapMutex;
 
-#endif //SYNCSERVER_H
+    //! The map storing last scene object states. 
+    QMap<QByteArray, QByteArray> m_objectStateMap;
+
+    //! The map storing scene objects lock status. 
+    QMultiMap<byte, QByteArray> m_lockMap;
+
+    //! Reference to the messageSender.
+    MessageSender *m_sender;
+
+public:
+
+    void CheckLocks(byte clientID);
+
+
+signals:
+    //!
+    //! Signal emitted when process is finished.
+    //!
+    void stopped();
+
+public slots:
+    //!
+    //! The broadcast thread's main worker loop.
+    //!
+    void run();
+
+};
+
+
+
+#endif // MESSAGERECEIVER_H

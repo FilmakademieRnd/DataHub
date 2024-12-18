@@ -29,7 +29,8 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include "CommandHandler.h"
 
-CommandHandler::CommandHandler(DataHub::Core* core, BroadcastHandler* zmqHandler, QString IPAdress, bool debug, zmq::context_t* context) : ZeroMQHandler(core, IPAdress, debug, context), m_zmqHandler(zmqHandler)
+CommandHandler::CommandHandler(DataHub::Core* core, MessageSender* messageSender, MessageReceiver *messageReceiver, QString IPAdress, bool debug, zmq::context_t* context) 
+	: ZeroMQHandler(core, IPAdress, debug, context), m_sender(messageSender), m_receiver(messageReceiver)
 {
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(tickTime(int)), Qt::DirectConnection);
 }
@@ -45,6 +46,7 @@ void CommandHandler::tickTime(int time)
 void CommandHandler::updatePingTimeouts(byte clientID)
 {
 	//update ping timeout
+	m_mutex.lock();
 	auto client = m_pingMap.find(clientID);
 	if (client != m_pingMap.end())
 	{
@@ -54,75 +56,52 @@ void CommandHandler::updatePingTimeouts(byte clientID)
 	{
 		m_pingMap.insert(clientID, m_time);
 
-		QByteArray newMessage((qsizetype)6, Qt::Uninitialized);
+		char newMessage[6];
+
 		newMessage[0] = m_targetHostID;
 		newMessage[1] = m_core->m_time;
-		newMessage[2] = BroadcastHandler::MessageType::DATAHUB;
+		newMessage[2] = MessageReceiver::MessageType::DATAHUB;
 		newMessage[3] = 0; // data hub type 0 = connection status update
 		newMessage[4] = 1; // new client registered
 		newMessage[5] = clientID; // new client ID
 
-		m_zmqHandler->BroadcastMessage(newMessage);
+		m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 6)));
 
 		qInfo() << "New client registered:" << clientID;
 	}
+	m_mutex.unlock();
 }
 
 void CommandHandler::checkPingTimeouts()
 {
 	//check if ping timed out for any client
-	foreach(const unsigned int time, m_pingMap)
+	m_mutex.lock();
+	foreach(const unsigned int time, m_pingMap.values())
 	{
 		if (m_time - time > m_pingTimeout)
 		{
 			//connection to client lost
 			byte clientID = m_pingMap.key(time);
 			m_pingMap.remove(clientID);
-			m_zmqHandler->ClientLost(clientID);
 
-			QByteArray newMessage((qsizetype)6, Qt::Uninitialized);
+			char newMessage[6];
+
 			newMessage[0] = m_targetHostID;
 			newMessage[1] = m_core->m_time;
-			newMessage[2] = BroadcastHandler::MessageType::DATAHUB;
+			newMessage[2] = MessageReceiver::MessageType::DATAHUB;
 			newMessage[3] = 0; // data hub type 0 = connection status update
 			newMessage[4] = 0; // client lost
 			newMessage[5] = clientID; // new client ID
 
-			m_zmqHandler->BroadcastMessage(newMessage);
+			m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 6)));
 
 			qInfo().nospace() << "Lost connection to client:" << clientID;
 
 			//check if client had lock
-			m_mutex.lock();
-			QList<QByteArray> values = m_zmqHandler->GetLockMap().values(clientID);
-			m_mutex.unlock();
-
-			if (!values.isEmpty())
-			{
-				//release lock
-				qInfo() << "Resetting locks!";
-				char lockReleaseMsg[7];
-				for (int i = 0; i < values.count(); i++)
-				{
-					const char* value = values[i].constData();
-					lockReleaseMsg[0] = static_cast<char>(m_targetHostID);
-					lockReleaseMsg[1] = static_cast<char>(m_core->m_time);  // time
-					lockReleaseMsg[2] = static_cast<char>(BroadcastHandler::MessageType::LOCK);
-					lockReleaseMsg[3] = value[0]; // sID
-					//memcpy(lockReleaseMsg + 4, value + 1, 2);
-					lockReleaseMsg[4] = value[1]; // oID part1
-					lockReleaseMsg[5] = value[2]; // oID part2
-					lockReleaseMsg[6] = static_cast<char>(false);
-
-					m_zmqHandler->BroadcastMessage(lockReleaseMsg);
-					//sender.send(lockReleaseMsg, 7);
-					m_mutex.lock();
-					m_zmqHandler->GetLockMap().remove(clientID);
-					m_mutex.unlock();
-				}
-			}
+			m_receiver->CheckLocks(clientID);
 		}
 	}
+	m_mutex.unlock();
 }
 
 void CommandHandler::run()
@@ -153,23 +132,21 @@ void CommandHandler::run()
 
 			switch (msgType)
 			{
-			case BroadcastHandler::MessageType::PING:
+			case MessageReceiver::MessageType::PING:
 			{
 				char responseMsg[3];
 				responseMsg[0] = m_targetHostID;
 				responseMsg[1] = m_core->m_time;
-				responseMsg[2] = BroadcastHandler::MessageType::PING;
+				responseMsg[2] = MessageReceiver::MessageType::PING;
 
 				QThread::msleep(10);
 				socket.send(responseMsg, 3);
 
-				m_mutex.lock();
 				updatePingTimeouts(clientID);
-				m_mutex.unlock();
 
 				break;
 			}
-			case BroadcastHandler::MessageType::DATAHUB:
+			case MessageReceiver::MessageType::DATAHUB:
 			{
 				// ...
 				break;

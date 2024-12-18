@@ -34,6 +34,8 @@ any part thereof, the company/individual will have to contact Filmakademie
 //! @date 03.07.2023
 
 #include "SyncServer.h"
+#include "messageReceiver.h"
+#include "messagesender.h"
 #include <QtNetwork/QNetworkInterface>
 #include <QtNetwork/QHostAddress>
 #include <iostream>
@@ -134,8 +136,11 @@ namespace DataHub {
 
     void SyncServer::stop()
     {
-        m_broadcastHandler->requestStop();
-        m_broadcastHandlerThread->exit();
+        m_messageReceiver->requestStop();
+        m_messageReceiverThread->exit();
+
+        m_messageSender->requestStop();
+        m_messageSenderThread->exit();
 
         m_commandHandler->requestStop();
         m_commandHandlerThread->exit();
@@ -143,25 +148,31 @@ namespace DataHub {
 
     void SyncServer::InitServer()
     {
-        //create thread to receive zeroMQ messages from clients
+        // create instances of sender, receiver and command hadler
+        m_messageSender = new MessageSender(core(), m_ownIP, m_debug, m_paramHistory, m_lockHistory, m_context);
+        m_messageReceiver = new MessageReceiver(core(), m_messageSender, m_ownIP, m_debug, m_paramHistory, m_lockHistory, m_context);
+        m_commandHandler = new CommandHandler(core(), m_messageSender, m_messageReceiver, m_ownIP, m_debug, m_context);
        
-        m_broadcastHandler = new BroadcastHandler(core(), m_ownIP, m_debug, m_paramHistory, m_lockHistory, m_context);
-        m_broadcastHandlerThread = new QThread(this);
-
-        //create thread to receive command messages from clients
-
-        m_commandHandler = new CommandHandler(core(), m_broadcastHandler, m_ownIP, m_debug, m_context);
+        // create threads
+        m_messageSenderThread = new QThread(this);
+        m_messageReceiverThread = new QThread(this);
         m_commandHandlerThread = new QThread(this);
 
-        m_broadcastHandler->moveToThread(m_broadcastHandlerThread);
-        QObject::connect(m_broadcastHandlerThread, &QThread::started, m_broadcastHandler, &BroadcastHandler::run);
-
+        // move instances to their threads
+        m_messageSender->moveToThread(m_messageSenderThread);
+        m_messageReceiver->moveToThread(m_messageReceiverThread);
         m_commandHandler->moveToThread(m_commandHandlerThread);
+        
+        // connect run
+        QObject::connect(m_messageSenderThread, &QThread::started, m_messageSender, &MessageSender::run);
+        QObject::connect(m_messageReceiverThread, &QThread::started, m_messageReceiver, &MessageReceiver::run);
         QObject::connect(m_commandHandlerThread, &QThread::started, m_commandHandler, &CommandHandler::run);
 
-        m_broadcastHandlerThread->start();
-        m_broadcastHandler->requestStart();
-
+        // start 
+        m_messageSenderThread->start();
+        m_messageSender->requestStart();
+        m_messageReceiverThread->start();
+        m_messageReceiver->requestStart();
         m_commandHandlerThread->start();
         m_commandHandler->requestStart();
     }

@@ -27,55 +27,63 @@ any part thereof, the company/individual will have to contact Filmakademie
 -----------------------------------------------------------------------------
 */
 
-//! @file "SyncServer.h"
-//! @brief Datahub Plugin: Sync Server defines the network bridge between TRACER clients and servers.
-//! @author Simon Spielmann
-//! @version 1
-//! @date 03.07.2023
+#ifndef MESSAGESENDER_H
+#define MESSAGESENDER_H
 
-#ifndef SYNCSERVER_H
-#define SYNCSERVER_H
-
-#include <QThread>
-#include <QMutex>
-#include "plugininterface.h"
-#include "commandHandler.h"
+#include "zeroMQHandler.h"
 
 
-namespace DataHub {
-	
-	class PLUGININTERFACESHARED_EXPORT SyncServer : public PluginInterface
-	{
-		Q_OBJECT
-		Q_PLUGIN_METADATA(IID "de.datahub.PluginInterface" FILE "metadata.json")
-		Q_INTERFACES(DataHub::PluginInterface)
+class MessageSender : public ZeroMQHandler
+{
+    Q_OBJECT
 
-	public:
-		SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_messageReceiver(0), m_messageReceiverThread(0) { }
-	
-	public:
-		virtual void run();
-		virtual void stop();
+public:
+    explicit MessageSender(DataHub::Core* core, QString IPAdress = "", bool debug = false, bool parameterHistory = true, bool lockHistory = true, zmq::context_t* context = NULL);
+    
+    inline void QueMessage(zmq::message_t&& message)
+    {
+        m_mutex.lock();
+        m_messageList.add(std::move(message));
+        m_mutex.unlock();
+    }
 
-	private:
-		QString m_ownIP;
-		bool m_debug;
-		bool m_lockHistory;
-		bool m_paramHistory;
-		zmq::context_t *m_context;
-		QThread* m_messageReceiverThread;
-		QThread* m_messageSenderThread;
-		QThread* m_commandHandlerThread;
-		MessageReceiver* m_messageReceiver;
-		MessageSender* m_messageSender;
-		CommandHandler* m_commandHandler;
-	protected:
-		void init();
-	private:
-		void InitServer();
-		void printHelp();
-	};
+	//!
+    //! Function to broadcast a messagte to all connected clients.
+    //!
+    //! @param message The message to be broadcasted. 
+    //!
+    inline void QueBroadcastMessage(zmq::message_t&& message)
+    {
+        m_mutex.lock();
+        m_broadcastMessageList.add(std::move(message));
+        m_mutex.unlock();
+    }
 
-}
+private:
+    //! Buffer storing messages for send.
+    zmq::multipart_t m_messageList;
+    //! Buffer storing broadcast messages for send.
+    zmq::multipart_t m_broadcastMessageList;
+    //! Buffer used for broadcasting sync messages.
+    byte m_syncMessage[3] = { m_targetHostID,0,MessageType::EMPTY };
+    //! Buffer used for broadcasting general purpose messages.
+    QByteArray m_broadcastMessage;
 
-#endif //SYNCSERVER_H
+public slots:
+    //!
+    //! The broadcast thread's main worker loop.
+    //!
+    void run();
+
+private slots:
+    //!
+    //! Slot to create a new sync message.
+    //!
+    //! @param time The current tracer time.
+    //!
+    void createSyncMessage(int time);
+
+};
+
+
+#endif // MESSAGESENDER_H

@@ -114,7 +114,7 @@ namespace DataHub {
 
 	signals:
 		void tickTick(int time);
-		//void tickHalf(int time);
+		void tickHalf(int time);
 		void tickSecond(int time);
 		void tickSecondRandom(int time);
 		void storeDataSignal(QByteArray data);
