@@ -30,7 +30,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include "CommandHandler.h"
 
 CommandHandler::CommandHandler(DataHub::Core* core, MessageSender* messageSender, MessageReceiver *messageReceiver, QString IPAdress, bool debug, zmq::context_t* context) 
-	: ZeroMQHandler(core, IPAdress, debug, context), m_sender(messageSender), m_receiver(messageReceiver)
+	: ZeroMQHandler(core, IPAdress, debug, false, context), m_sender(messageSender), m_receiver(messageReceiver)
 {
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(tickTime(int)), Qt::DirectConnection);
 }

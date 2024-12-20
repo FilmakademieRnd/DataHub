@@ -30,8 +30,8 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include "messageSender.h"
 #include <iostream>
 
-MessageSender::MessageSender(DataHub::Core* core, QString IPAdress, bool debug, bool parameterHistory, bool lockHistory, zmq::context_t* context) :
-    ZeroMQHandler(core, IPAdress, debug, context)
+MessageSender::MessageSender(DataHub::Core* core, QString IPAdress, bool debug, bool webSockets, zmq::context_t* context) :
+    ZeroMQHandler(core, IPAdress, debug, webSockets, context)
 {
     connect(core, SIGNAL(tickSecondRandom(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
 }
@@ -60,7 +60,7 @@ void MessageSender::createSyncMessage(int time)
 void MessageSender::run()
 {
 	zmq::socket_t sender(*m_context, ZMQ_PUB);
-	sender.bind(QString("tcp://" + m_IPadress + ":5556").toLatin1().data());
+	sender.bind(QString(m_addressPrefix + m_IPadress + m_addressPortBase + "6").toLatin1().data());
 
 	qDebug() << "Starting " << metaObject()->className();
 

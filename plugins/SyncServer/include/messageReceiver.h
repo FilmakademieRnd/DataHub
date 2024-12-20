@@ -46,7 +46,7 @@ public:
     //! @param debug Flag determin wether debug informations shall be printed.
     //! @param context The ZMQ context used by the BroadcastHandler.
     //! 
-    explicit MessageReceiver(DataHub::Core* core, MessageSender* messageSender, QString IPAdress = "", bool debug = false, bool parameterHistory = true, bool lockHistory = true, zmq::context_t* context = NULL);
+    explicit MessageReceiver(DataHub::Core* core, QList<MessageSender*> messageSenders, QString IPAdress = "", bool debug = false, bool webSockets = false, bool parameterHistory = true, bool lockHistory = true, zmq::context_t* context = NULL);
 
     ~MessageReceiver()
     {    }
@@ -64,13 +64,37 @@ private:
     //! The map storing scene objects lock status. 
     QMultiMap<byte, QByteArray> m_lockMap;
 
-    //! Reference to the messageSender.
-    MessageSender *m_sender;
+    //! List of references to all message senders.
+    QList<MessageSender*> m_senders;
+
+private:
+    //! function queing message into all registered senders send ques.
+     inline void QueMessage(zmq::message_t&& message)
+     {
+         for (int i = 1; i < m_senders.count(); i++) {
+             zmq::message_t msgCopy;
+             msgCopy.copy(message);
+             m_senders[i]->QueMessage(std::move(msgCopy));
+         }
+
+         m_senders[0]->QueMessage(std::move(message));
+     }
+
+     //! function queing message into all registered senders send ques.
+     inline void QueBroadcastMessage(zmq::message_t&& message)
+     {
+         for (int i = 1; i < m_senders.count(); i++) {
+             zmq::message_t msgCopy;
+             msgCopy.copy(message);
+             m_senders[i]->QueBroadcastMessage(std::move(msgCopy));
+         }
+
+         m_senders[0]->QueBroadcastMessage(std::move(message));
+     }
 
 public:
 
     void CheckLocks(byte clientID);
-
 
 signals:
     //!

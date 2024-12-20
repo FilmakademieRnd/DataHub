@@ -51,10 +51,19 @@ public:
     //! @param debug Flag determin wether debug informations shall be printed.
     //! @param context The ZMQ context used by the BroadcastHandler.
     //! 
-    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress, bool debug, zmq::context_t* context) : m_core(core), m_IPadress(IPAdress), m_debug(debug), m_context(context) 
+    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress, bool debug, bool webSockets, zmq::context_t* context) : m_core(core), m_IPadress(IPAdress), m_debug(debug), m_context(context) 
     {
         m_stop = false;
         m_working = false;
+
+        if (webSockets) {
+            m_addressPrefix = "ws://";
+            m_addressPortBase = ":550";
+        }
+        else {
+            m_addressPrefix = "tcp://";
+            m_addressPortBase = ":555";
+        }
     }
 
 	//! Tracer message types.
@@ -117,9 +126,6 @@ public:
     }
 
 protected:
-    //! Shall debug messages be printed.
-    bool m_debug;
-
     //! ID displayed as clientID for messages redistributed through syncServer.
     byte m_targetHostID = 0;
 
@@ -137,6 +143,12 @@ protected:
 
     //! If true process is running.
     bool m_working;
+
+    //! Shall debug messages be printed.
+    bool m_debug;
+
+    QString m_addressPrefix;
+    QString m_addressPortBase;
 
     //! A reference to the DataHub core.
     DataHub::Core* m_core;

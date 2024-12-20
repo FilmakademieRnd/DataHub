@@ -58,6 +58,7 @@ namespace DataHub {
         {
             m_ownIP = "";
             m_debug = false;
+            m_webSockets = false;
 
             if (commands.length() < 1)
             {
@@ -90,6 +91,11 @@ namespace DataHub {
                     {
                         std::cout << "Debug output enabled." << std::endl;
                         m_debug = true;
+                    }
+                    else if (commands[i] == "-ws")
+                    {
+                        std::cout << "Web Sockets enabled." << std::endl;
+                        m_webSockets = true;
                     }
                     else if (commands[i] == "-np")
                     {
@@ -136,45 +142,58 @@ namespace DataHub {
 
     void SyncServer::stop()
     {
-        m_messageReceiver->requestStop();
-        m_messageReceiverThread->exit();
+        for (int i = 0; i < m_threadlist.count(); i++)
+        {
+            m_threadlist[i]->exit();
+        }
 
-        m_messageSender->requestStop();
-        m_messageSenderThread->exit();
+        for (int i = 0; i < m_handlerlist.count(); i++)
+        {
+            m_handlerlist[i]->requestStop();
+        }
 
-        m_commandHandler->requestStop();
-        m_commandHandlerThread->exit();
+        m_threadlist.clear();
+        m_handlerlist.clear();
     }
 
     void SyncServer::InitServer()
     {
-        // create instances of sender, receiver and command hadler
-        m_messageSender = new MessageSender(core(), m_ownIP, m_debug, m_paramHistory, m_lockHistory, m_context);
-        m_messageReceiver = new MessageReceiver(core(), m_messageSender, m_ownIP, m_debug, m_paramHistory, m_lockHistory, m_context);
-        m_commandHandler = new CommandHandler(core(), m_messageSender, m_messageReceiver, m_ownIP, m_debug, m_context);
-       
-        // create threads
-        m_messageSenderThread = new QThread(this);
-        m_messageReceiverThread = new QThread(this);
-        m_commandHandlerThread = new QThread(this);
-
-        // move instances to their threads
-        m_messageSender->moveToThread(m_messageSenderThread);
-        m_messageReceiver->moveToThread(m_messageReceiverThread);
-        m_commandHandler->moveToThread(m_commandHandlerThread);
+        MessageSender *messageSenderWS = 0;
+        MessageReceiver* messageReceiver = 0;
+        MessageReceiver *messageReceiverWS = 0;
         
-        // connect run
-        QObject::connect(m_messageSenderThread, &QThread::started, m_messageSender, &MessageSender::run);
-        QObject::connect(m_messageReceiverThread, &QThread::started, m_messageReceiver, &MessageReceiver::run);
-        QObject::connect(m_commandHandlerThread, &QThread::started, m_commandHandler, &CommandHandler::run);
+        MessageSender* messageSender = new MessageSender(core(), m_ownIP, m_debug, false, m_context);
 
-        // start 
-        m_messageSenderThread->start();
-        m_messageSender->requestStart();
-        m_messageReceiverThread->start();
-        m_messageReceiver->requestStart();
-        m_commandHandlerThread->start();
-        m_commandHandler->requestStart();
+        if (m_webSockets)
+        {
+            messageSenderWS = new MessageSender(core(), m_ownIP, m_debug, true, m_context);
+            messageReceiverWS = new MessageReceiver(core(), QList<MessageSender*>{ messageSender, messageSenderWS }, m_ownIP, m_debug, true, m_paramHistory, m_lockHistory, m_context);
+            messageReceiver = new MessageReceiver(core(), QList<MessageSender*>{ messageSender, messageSenderWS}, m_ownIP, m_debug, false, m_paramHistory, m_lockHistory, m_context);
+        }
+        else
+            messageReceiver = new MessageReceiver(core(), QList<MessageSender*>{ messageSender }, m_ownIP, m_debug, false, m_paramHistory, m_lockHistory, m_context);
+
+        CommandHandler* commandHandler = new CommandHandler(core(), messageSender, messageReceiver, m_ownIP, m_debug, m_context);
+
+        InitHandler(messageSender);
+        InitHandler(messageReceiver);
+        InitHandler(commandHandler);
+
+        if (m_webSockets)
+        {
+            InitHandler(messageSenderWS);
+            InitHandler(messageReceiverWS);
+        }
+    }
+
+    void SyncServer::InitHandler(ZeroMQHandler *handler)
+    {
+        QThread *thread = new QThread(this);
+        m_threadlist.append(thread);
+        handler->moveToThread(thread);
+        QObject::connect(thread, &QThread::started, handler, &ZeroMQHandler::run);
+
+        thread->start();
     }
 
     void SyncServer::printHelp()
@@ -182,6 +201,7 @@ namespace DataHub {
         std::cout << "-h:       display this help" << std::endl;
         std::cout << "-ownIP:   IP address of this computer (required)" << std::endl;
         std::cout << "-d:       run with debug output" << std::endl;
+        std::cout << "-ws:      run with Web Sockets" << std::endl;
         std::cout << "-np:      run without parameter history" << std::endl;
         std::cout << "-nl:      run without lock history" << std::endl;
     }

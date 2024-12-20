@@ -30,8 +30,8 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include "messageReceiver.h"
 #include <iostream>
 
-MessageReceiver::MessageReceiver(DataHub::Core* core, MessageSender* messageSender, QString IPAdress, bool debug, bool parameterHistory, bool lockHistory, zmq::context_t* context) :
-									m_sender(messageSender), m_parameterHistory(parameterHistory), m_lockHistory(lockHistory), ZeroMQHandler(core, IPAdress, debug, context)
+MessageReceiver::MessageReceiver(DataHub::Core* core, QList<MessageSender*> messageSenders, QString IPAdress, bool debug, bool webSockets, bool parameterHistory, bool lockHistory, zmq::context_t* context) :
+									m_senders(messageSenders), m_parameterHistory(parameterHistory), m_lockHistory(lockHistory), ZeroMQHandler(core, IPAdress, debug, webSockets, context)
 {
 }
 
@@ -58,7 +58,7 @@ void MessageReceiver::CheckLocks(byte clientID)
 			lockReleaseMsg[5] = value[2]; // oID part2
 			lockReleaseMsg[6] = static_cast<char>(false);
 
-			m_sender->QueBroadcastMessage(std::move(zmq::message_t(lockReleaseMsg, 7)));
+			QueBroadcastMessage(std::move(zmq::message_t(lockReleaseMsg, 7)));
 			m_lockMap.remove(clientID);
 		}
 	}
@@ -69,7 +69,7 @@ void MessageReceiver::CheckLocks(byte clientID)
 void MessageReceiver::run()
 {
 	zmq::socket_t socket(*m_context, ZMQ_SUB);
-	socket.bind(QString("tcp://" + m_IPadress + ":5557").toLatin1().data());
+	socket.bind(QString(m_addressPrefix + m_IPadress + m_addressPortBase + "7").toLatin1().data());
 	socket.setsockopt(ZMQ_SUBSCRIBE, "client", 0);
 
 	zmq::pollitem_t item = { static_cast<void*>(socket), 0, ZMQ_POLLIN, 0 };
@@ -141,7 +141,7 @@ void MessageReceiver::run()
 					}
 				}
 
-				m_sender->QueMessage(std::move(zmq::message_t(newMessage.data(), newMessage.size())));
+				QueMessage(std::move(zmq::message_t(newMessage.data(), newMessage.size())));
 				break;
 			}
 			case MessageType::LOCK:
@@ -193,7 +193,7 @@ void MessageReceiver::run()
 						std::cout << std::endl;
 					}
 				}
-				m_sender->QueMessage(std::move(*messageIter));
+				QueMessage(std::move(*messageIter));
 				break;
 			}
 			case MessageType::PARAMETERUPDATE:
@@ -211,14 +211,14 @@ void MessageReceiver::run()
 						start += length;
 					}
 				}
-				m_sender->QueMessage(std::move(*messageIter));
+				QueMessage(std::move(*messageIter));
 				break;
 			}
 			case MessageType::SYNC:
 			case MessageType::UNDOREDOADD:
 			case MessageType::RESETOBJECT:
 			case MessageType::RPC:
-				m_sender->QueMessage(std::move(*messageIter));
+				QueMessage(std::move(*messageIter));
 				break;
 			}
 		}

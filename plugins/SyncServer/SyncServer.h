@@ -51,7 +51,7 @@ namespace DataHub {
 		Q_INTERFACES(DataHub::PluginInterface)
 
 	public:
-		SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_messageReceiver(0), m_messageReceiverThread(0) { }
+		SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)) { }
 	
 	public:
 		virtual void run();
@@ -60,19 +60,19 @@ namespace DataHub {
 	private:
 		QString m_ownIP;
 		bool m_debug;
+		bool m_webSockets;
 		bool m_lockHistory;
 		bool m_paramHistory;
 		zmq::context_t *m_context;
-		QThread* m_messageReceiverThread;
-		QThread* m_messageSenderThread;
-		QThread* m_commandHandlerThread;
-		MessageReceiver* m_messageReceiver;
-		MessageSender* m_messageSender;
-		CommandHandler* m_commandHandler;
+		QList<QThread*> m_threadlist;
+		QList<ZeroMQHandler*> m_handlerlist;
+		
 	protected:
 		void init();
+
 	private:
 		void InitServer();
+		void InitHandler(ZeroMQHandler *handler);
 		void printHelp();
 	};
 

@@ -38,7 +38,7 @@ class MessageSender : public ZeroMQHandler
     Q_OBJECT
 
 public:
-    explicit MessageSender(DataHub::Core* core, QString IPAdress = "", bool debug = false, bool parameterHistory = true, bool lockHistory = true, zmq::context_t* context = NULL);
+    explicit MessageSender(DataHub::Core* core, QString IPAdress = "", bool debug = false, bool webSockets = false, zmq::context_t* context = NULL);
     
     inline void QueMessage(zmq::message_t&& message)
     {
