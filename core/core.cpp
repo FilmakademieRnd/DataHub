@@ -43,46 +43,41 @@ namespace DataHub {
     {
         m_timesteps = (int)((s_timestepsBase / s_framerate) * s_framerate);
 
-        TimerThread tthread(1000.f / s_framerate, false);
-        TimerThread trandthread(1000.f, true);
+        m_tthread = new TimerThread(1000.f / s_framerate, false, this);
+        m_trandthread = new TimerThread(1000.f, true, this);
 
-        connect(&tthread, SIGNAL(tick()), this, SLOT(updateTime()), Qt::DirectConnection);
-        connect(&trandthread, SIGNAL(tick()), this, SLOT(updateTimeRand()), Qt::DirectConnection);
-        tthread.start();
-        trandthread.start();
-        tthread.setPriority(QThread::HighPriority);
-        trandthread.setPriority(QThread::HighPriority);
+        connect(m_tthread, SIGNAL(tick()), this, SLOT(updateTime()), Qt::DirectConnection);
+        connect(m_trandthread, SIGNAL(tick()), this, SLOT(updateTimeRand()), Qt::DirectConnection);
 
-        loadPlugins();
+        m_tthread->start();
+        m_trandthread->start();
+
+        m_tthread->setPriority(QThread::HighPriority);
+        m_trandthread->setPriority(QThread::HighPriority);
     }
 
-	Core::Core(QStringList cmdlineArgs)
+	Core::Core(QStringList cmdlineArgs) : Core()
 	{
         m_cmdlineArgs = cmdlineArgs;
-       
-        m_timesteps = (int)((s_timestepsBase / s_framerate) * s_framerate);
-
-        TimerThread tthread(1000.f / s_framerate, false);
-        TimerThread trandthread(1000.f, true);
-
-        connect(&tthread, SIGNAL(tick()), this, SLOT(updateTime()), Qt::DirectConnection);
-        connect(&trandthread, SIGNAL(tick()), this, SLOT(updateTimeRand()), Qt::DirectConnection);
-        tthread.start();
-        trandthread.start();
-        tthread.setPriority(QThread::HighPriority);
-        trandthread.setPriority(QThread::HighPriority);
-
-        loadPlugins();
 	}
 
-    Core::~Core()
+    void Core::coreQuit()
     {
-        qDebug() << "Exiting all Threads...";
+        // quit trigger threads first...
+        m_tthread->quit();
+        m_tthread->wait();
+        m_trandthread->quit();
+        m_trandthread->wait();
+       
+        qInfo() << "Exiting all Threads...";
 
+        // stop all plugins
         foreach(PluginInterface * plugin, s_plugins)
         {
             plugin->stop();
         }
+
+        qInfo() << "...all Threads ended.";
     }
 
     QStringList Core::getAppArguments()
@@ -114,9 +109,14 @@ namespace DataHub {
         emit tickSecondRandom(m_time);
     }
 
-    void Core::storeData(QByteArray data)
+    void Core::recordData(QByteArray data)
     {
-        emit storeDataSignal(data);
+        emit recordDataSignal(data);
+    }
+
+    void Core::sceneReceive(QString ip)
+    {
+        emit sceneReceiveSignal(ip);
     }
 
     void Core::loadPlugins()
@@ -132,6 +132,7 @@ namespace DataHub {
             QPluginLoader pluginLoader(filePath);
             QObject* plugin = pluginLoader.instance();
             if (plugin) {
+                plugin->setParent(this);
                 PluginInterface* pluginInterface = qobject_cast<PluginInterface*>(plugin);
                 if (pluginInterface)
                 {
@@ -140,7 +141,6 @@ namespace DataHub {
                     qDebug() << "Plugin " + filePath + " loaded.";
                     pluginInterface->setCore(this);
                     pluginInterface->init();
-                    //pluginInterface->run();
                 }
                 else
                     pluginLoader.unload();
@@ -151,7 +151,6 @@ namespace DataHub {
         for (DataHub::PluginInterface* plugin : s_plugins) {
             plugin->run();
         }
-
     }
 
 }

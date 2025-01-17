@@ -44,9 +44,13 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 namespace DataHub {
 
+    SyncServer::SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_isRunning(false)
+    {
+    }
+
     void SyncServer::init()
     {
-        // fill me!
+        connect(core(), &Core::sceneReceiveSignal, this, &SyncServer::sceneReceive);
     }
 
 	void SyncServer::run()
@@ -54,7 +58,7 @@ namespace DataHub {
 		QStringList commands = core()->getAppArguments();
 		commands.removeAt(0);
 
-        while (true)
+        while (!m_isRunning)
         {
             m_ownIP = "";
             m_debug = false;
@@ -133,7 +137,7 @@ namespace DataHub {
                     printHelp();
                 }
                 else {
-                    InitServer();
+                    initServer();
                 }
             }
             commands.clear();
@@ -142,21 +146,16 @@ namespace DataHub {
 
     void SyncServer::stop()
     {
-        for (int i = 0; i < m_threadlist.count(); i++)
+        foreach (ZeroMQHandler *handler, m_handlerlist)
         {
-            m_threadlist[i]->exit();
+            cleanupHandler(handler);
         }
 
-        for (int i = 0; i < m_handlerlist.count(); i++)
-        {
-            m_handlerlist[i]->requestStop();
-        }
-
-        m_threadlist.clear();
-        m_handlerlist.clear();
+        m_context->shutdown();
+        m_context->close();
     }
 
-    void SyncServer::InitServer()
+    void SyncServer::initServer()
     {
         MessageSender *messageSenderWS = 0;
         MessageReceiver* messageReceiver = 0;
@@ -175,25 +174,30 @@ namespace DataHub {
 
         CommandHandler* commandHandler = new CommandHandler(core(), messageSender, messageReceiver, m_ownIP, m_debug, m_context);
 
-        InitHandler(messageSender);
-        InitHandler(messageReceiver);
-        InitHandler(commandHandler);
+        initHandler(messageSender);
+        initHandler(messageReceiver);
+        initHandler(commandHandler);
 
         if (m_webSockets)
         {
-            InitHandler(messageSenderWS);
-            InitHandler(messageReceiverWS);
+            initHandler(messageSenderWS);
+            initHandler(messageReceiverWS);
         }
+
+        m_isRunning = true;
     }
 
-    void SyncServer::InitHandler(ZeroMQHandler *handler)
+    void SyncServer::initHandler(ZeroMQHandler *handler)
     {
-        QThread *thread = new QThread(this);
-        m_threadlist.append(thread);
-        handler->moveToThread(thread);
-        QObject::connect(thread, &QThread::started, handler, &ZeroMQHandler::run);
+        m_handlerlist.append(handler);
+        handler->requestStart();
+    }
 
-        thread->start();
+    void SyncServer::cleanupHandler(ZeroMQHandler* handler)
+    {
+        m_handlerlist.removeOne(handler);
+        handler->requestStop();
+        delete handler;
     }
 
     void SyncServer::printHelp()
@@ -206,4 +210,10 @@ namespace DataHub {
         std::cout << "-nl:      run without lock history" << std::endl;
     }
 
+    void SyncServer::sceneReceive(QString ip)
+    {
+        m_sceneReceiver = new SceneReceiver(core(), ip, false, m_context);
+        QObject::connect(m_sceneReceiver, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
+        m_sceneReceiver->requestStart();
+    }
 }

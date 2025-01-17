@@ -35,19 +35,45 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include <QtCore>
 #include <QDebug>
-#include <csignal>
+#include <signal.h>
 #include "core.h"
+//#include <signal.h>
 
 using namespace std;
 using namespace DataHub;
 
+class DataHubApp : public QCoreApplication
+{
+private:
+	Core *m_core;
+public:
+	DataHubApp(int argc, char** argv) : QCoreApplication(argc, argv) 
+	{
+		QStringList cmdlineArgs = QCoreApplication::arguments();
+		m_core = new Core(cmdlineArgs);
+		connect(this, SIGNAL(aboutToQuit()), m_core, SLOT(coreQuit()));
+		QTimer::singleShot(0, m_core, SLOT(loadPlugins()));
+
+	}
+	~DataHubApp() 
+	{
+		delete m_core;
+	}
+};
+
+void sigHandler(int s)
+{
+	DataHubApp::quit();
+}
 
 int main(int argc, char** argv)
 {
-    QCoreApplication a(argc, argv);
-	QStringList cmdlineArgs = QCoreApplication::arguments();
+	DataHubApp  a(argc, argv);
 
-	Core core(cmdlineArgs);
+	signal(SIGINT, sigHandler);
+	signal(SIGTERM, sigHandler);
+	signal(SIGBREAK, sigHandler);
+	signal(SIGABRT, sigHandler);
 
-	return a.exec();
+ 	return a.exec();
 }

@@ -53,6 +53,10 @@ public:
     //! 
     explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress, bool debug, bool webSockets, zmq::context_t* context) : m_core(core), m_IPadress(IPAdress), m_debug(debug), m_context(context) 
     {
+        m_thread = new QThread(this);
+        this->moveToThread(m_thread);
+        QObject::connect(m_thread, &QThread::started, this, &ZeroMQHandler::run);
+
         m_stop = false;
         m_working = false;
 
@@ -65,6 +69,14 @@ public:
             m_addressPortBase = ":555";
         }
     }
+
+	~ZeroMQHandler()
+	{
+		m_thread->quit();
+		m_thread->wait();
+
+        delete m_thread;
+	}
 
 	//! Tracer message types.
 	enum MessageType
@@ -107,22 +119,7 @@ public:
     //! Request this process to start working.
     void requestStart()
     {
-        m_mutex.lock();
-        m_working = true;
-        m_stop = false;
-        qInfo() << metaObject()->className() << " requested to start";
-        m_mutex.unlock();
-    }
-
-    //! Request this process to stop working.
-    void requestStop()
-    {
-        m_mutex.lock();
-        if (m_working) {
-            m_stop = true;
-            qInfo() << metaObject()->className() << " stopping";
-        }
-        m_mutex.unlock();
+        m_thread->start();
     }
 
 protected:
@@ -153,15 +150,36 @@ protected:
     //! A reference to the DataHub core.
     DataHub::Core* m_core;
 
+    void startInfo(QString msg)
+    {
+        qInfo() << "Starting " << metaObject()->className() << msg;
+    }
+
+    void stopInfo(QString msg)
+    {
+        qInfo() << metaObject()->className() << msg << " stopped";// in Thread "<<thread()->currentThreadId();
+    }
+
+ private:
+     QThread *m_thread;
+
+
 signals:
     //!
     //! Signal emitted when process is finished.
     //!
-    void stopped();
+    void stopped(ZeroMQHandler*);
 
 public slots:
     //! Default thread worker loop.
     virtual void run() = 0;
+    //! Request this process to stop working.
+    void requestStop()
+    {
+       m_mutex.lock();
+       m_stop = true;
+       m_mutex.unlock();
+    }
 };
 
 

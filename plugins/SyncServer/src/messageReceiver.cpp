@@ -69,12 +69,14 @@ void MessageReceiver::CheckLocks(byte clientID)
 void MessageReceiver::run()
 {
 	zmq::socket_t socket(*m_context, ZMQ_SUB);
-	socket.bind(QString(m_addressPrefix + m_IPadress + m_addressPortBase + "7").toLatin1().data());
+	QString address = m_addressPrefix + m_IPadress + m_addressPortBase + "7";
+	socket.bind(address.toLatin1().data());
 	socket.setsockopt(ZMQ_SUBSCRIBE, "client", 0);
+	socket.setsockopt(ZMQ_RCVTIMEO, 100);
 
 	zmq::pollitem_t item = { static_cast<void*>(socket), 0, ZMQ_POLLIN, 0 };
 
-	qDebug() << "Starting " << metaObject()->className();
+	startInfo(address);
 
 	while (true) {
 
@@ -224,7 +226,6 @@ void MessageReceiver::run()
 		}
 
 		if (stop) {
-			qDebug() << "Stopping " << metaObject()->className();
 			break;
 		}
 
@@ -236,7 +237,7 @@ void MessageReceiver::run()
 	m_working = false;
 	m_mutex.unlock();
 
-	qDebug() << metaObject()->className() << " process stopped";// in Thread "<<thread()->currentThreadId();
+	stopInfo(address);
 
-	emit stopped();
+	emit stopped(this);
 }

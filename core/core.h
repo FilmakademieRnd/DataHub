@@ -50,19 +50,19 @@ namespace DataHub {
 		void run()
 		{
 			m_timer = new QTimer();
+			m_timer->moveToThread(this);
 			connect(m_timer, SIGNAL(timeout()), this, SIGNAL(tick()), Qt::DirectConnection);
 			if (m_random)
 				connect(m_timer, SIGNAL(timeout()), this, SLOT(setrandominterval()), Qt::DirectConnection);
 			m_timer->setTimerType(Qt::PreciseTimer);
 			m_timer->start(m_interval);
-			m_timer->moveToThread(this);
 			exec();
 		}
 
 	public:
-		TimerThread() : m_interval(1000), m_timer(0), m_random(false) {}
-		TimerThread(bool random) : m_interval(1000), m_timer(0), m_random(random) {}
-		TimerThread(float interval, bool random) : m_interval(qFloor(interval)), m_timer(0), m_random(random) {}
+		TimerThread(QObject* parent = nullptr) : m_interval(1000), m_timer(0), m_random(false), QThread(parent) {}
+		TimerThread(bool random, QObject* parent = nullptr) : m_interval(1000), m_timer(0), m_random(random), QThread(parent) {}
+		TimerThread(float interval, bool random, QObject* parent = nullptr) : m_interval(qFloor(interval)), m_timer(0), m_random(random), QThread(parent) {}
 
 	private:
 		bool m_random;
@@ -88,12 +88,14 @@ namespace DataHub {
 	public:
 		Core();
 		Core(QStringList cmdlineArgs);
-		~Core();
+
 	public:
 		unsigned char m_time = 0;
 	private:
 		QMultiMap<QString, PluginInterface*> s_plugins;
 		QStringList m_cmdlineArgs;
+		TimerThread *m_tthread;
+		TimerThread *m_trandthread;
 
 		unsigned char m_timesteps = 0;
 		static const int s_framerate = 60;
@@ -103,21 +105,24 @@ namespace DataHub {
 		QStringList getAppArguments();
 
 	public:
-		void storeData(QByteArray data);
-
-	private:
-		void loadPlugins();
+		void recordData(QByteArray data);
+		void sceneReceive(QString ip);
 
 	private slots:
 		void updateTime();
 		void updateTimeRand();
+		
+	public slots:
+		void loadPlugins();
+		void coreQuit();
 
 	signals:
 		void tickTick(int time);
 		void tickHalf(int time);
 		void tickSecond(int time);
 		void tickSecondRandom(int time);
-		void storeDataSignal(QByteArray data);
+		void recordDataSignal(QByteArray data);
+		void sceneReceiveSignal(QString ip);
         
 	};
 

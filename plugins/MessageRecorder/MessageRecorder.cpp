@@ -42,7 +42,7 @@ namespace DataHub {
 
     void MessageRecorder::init()
     {
-        QObject::connect(core(), &Core::storeDataSignal, this, &MessageRecorder::RecordDataSlot);
+        QObject::connect(core(), &Core::recordDataSignal, this, &MessageRecorder::RecordDataSlot);
     }
 
 	void MessageRecorder::run()

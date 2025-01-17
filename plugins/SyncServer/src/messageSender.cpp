@@ -60,9 +60,10 @@ void MessageSender::createSyncMessage(int time)
 void MessageSender::run()
 {
 	zmq::socket_t sender(*m_context, ZMQ_PUB);
-	sender.bind(QString(m_addressPrefix + m_IPadress + m_addressPortBase + "6").toLatin1().data());
+    QString address = m_addressPrefix + m_IPadress + m_addressPortBase + "6";
+	sender.bind(address.toLatin1().data());
 
-	qDebug() << "Starting " << metaObject()->className();
+    startInfo(address);
 
     while (true) {
 
@@ -88,9 +89,8 @@ void MessageSender::run()
         }
 
         m_mutex.unlock();
-
+        
         if (stop) {
-            qDebug() << "Stopping " << metaObject()->className();
             break;
         }
 
@@ -103,8 +103,8 @@ void MessageSender::run()
     m_working = false;
     m_mutex.unlock();
 
-    qDebug() << metaObject()->className() << " process stopped";// in Thread "<<thread()->currentThreadId();
+    stopInfo(address);
 
-    emit stopped();
+    emit stopped(this);
 }
 

@@ -26,62 +26,38 @@ any part thereof, the company/individual will have to contact Filmakademie
 (research<at>filmakademie.de) for an individual license agreement.
 -----------------------------------------------------------------------------
 */
+#ifndef SCENERECEIVER_H
+#define SCENERECEIVER_H
 
-//! @file "SyncServer.h"
-//! @brief Datahub Plugin: Sync Server defines the network bridge between TRACER clients and servers.
-//! @author Simon Spielmann
-//! @version 1
-//! @date 03.07.2023
+#include "zeroMQHandler.h"
+#include "sceneDataHandler.h"
 
-#ifndef SYNCSERVER_H
-#define SYNCSERVER_H
+class SceneReceiver : public ZeroMQHandler
+{
+	Q_OBJECT
+public:
+	//! 
+	//! Constructor
+	//! 
+    //! @param core A reference to the DataHub core.
+    //! @param IPAdress The IP adress the SceneReceiver shall connect to. 
+    //! @param debug Flag determin wether debug informations shall be printed.
+    //! @param context The ZMQ context used by the SceneReceiver.
+    //! 
+    explicit SceneReceiver(DataHub::Core* core, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
+    ~SceneReceiver();
 
-#include <QThread>
-#include <QMutex>
-#include "plugininterface.h"
-#include "commandHandler.h"
-#include "sceneReceiver.h"
+private:
+	//!
+	//! The list of request the reqester uses to request the packages.
+	//!
+	QList<QString> m_requests;
+    SceneDataHandler *m_sceneData;
 
+public slots:
+    //execute operations
+    void run();
 
-namespace DataHub {
-	
-	class PLUGININTERFACESHARED_EXPORT SyncServer : public PluginInterface
-	{
-		Q_OBJECT
-		Q_PLUGIN_METADATA(IID "de.datahub.PluginInterface" FILE "metadata.json")
-		Q_INTERFACES(DataHub::PluginInterface)
+};
 
-	public:
-		SyncServer(); 
-	
-	public:
-		virtual void run();
-		virtual void stop();
-
-	private:
-		QString m_ownIP;
-		bool m_debug;
-		bool m_webSockets;
-		bool m_lockHistory;
-		bool m_paramHistory;
-		bool m_isRunning;
-		zmq::context_t *m_context;
-		QList<ZeroMQHandler*> m_handlerlist;
-		ZeroMQHandler *m_sceneReceiver;
-		
-	protected:
-		void init();
-
-	private:
-		void initServer();
-		void initHandler(ZeroMQHandler *handler);
-		void cleanupHandler(ZeroMQHandler* handler);
-		void printHelp();
-
-	private slots:
-		void sceneReceive(QString ip);
-	};
-
-}
-
-#endif //SYNCSERVER_H
+#endif // SCENERECEIVER_H

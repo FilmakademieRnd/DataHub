@@ -110,10 +110,11 @@ void CommandHandler::run()
 {
 	zmq::socket_t socket(*m_context, ZMQ_REP);
 	//socket.setsockopt(ZMQ_CONNECT_TIMEOUT, 2000);
-	//socket.setsockopt(ZMQ_SNDTIMEO, 2000);
-	socket.bind(QString("tcp://" + m_IPadress + ":5558").toLatin1().data());
+	socket.setsockopt(ZMQ_RCVTIMEO, 100);
+	QString address = "tcp://" + m_IPadress + ":5558";
+	socket.bind(address.toLatin1().data());
 
-	qDebug() << "Starting " << metaObject()->className();
+	startInfo(address);
 
 	while (true) {
 		// checks if process should be aborted
@@ -124,6 +125,11 @@ void CommandHandler::run()
 		zmq::message_t message;
 		socket.recv(&message);
 
+		char responseMsg[3];
+		responseMsg[0] = m_targetHostID;
+		responseMsg[1] = m_core->m_time;
+		responseMsg[1] = 0;
+
 		if (message.size() > 0)
 		{
 			QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
@@ -131,15 +137,13 @@ void CommandHandler::run()
 			byte clientID = msgArray[0];
 			byte msgTime = msgArray[1];
 			byte msgType = msgArray[2];
-			byte msgServer = msgArray[3];
 
+			
 			switch (msgType)
 			{
 			case MessageReceiver::MessageType::PING:
 			{
-				char responseMsg[3];
-				responseMsg[0] = m_targetHostID;
-				responseMsg[1] = m_core->m_time;
+				byte msgServer = msgArray[3];
 				responseMsg[2] = MessageReceiver::MessageType::PING;
 
 				QThread::msleep(10);
@@ -151,16 +155,28 @@ void CommandHandler::run()
 			}
 			case MessageReceiver::MessageType::DATAHUB:
 			{
-				// ...
-				break;
+				responseMsg[2] = MessageReceiver::MessageType::DATAHUB;
+
+				switch (msgArray[3])
+				{
+				case CommandHandler::MessageType::REQUESTSCENE:
+					//m_core->sceneReceive(m_IPadress.section('.', 0, 2) + "." + QString::number(clientID));
+					m_core->sceneReceive(m_IPadress.section('.', 0, 2) + "." + QString::number(1));
+
+					break;
+				case CommandHandler::MessageType::SENDSCENE:
+					//m_core->sceneSend(m_IPadress.section('.', 0, 2) + "." + QString::number(clientID));
+					break;
+				}
 			}
 			default:
 				break;
 			}
 		}
 
+
+
 		if (stop) {
-			qDebug() << "Stopping CommandHandler";// in Thread "<<thread()->currentThreadId();
 			break;
 		}
 
@@ -172,7 +188,7 @@ void CommandHandler::run()
 	m_working = false;
 	m_mutex.unlock();
 
-	qDebug() << "CommandHandler process stopped";// in Thread "<<thread()->currentThreadId();
+	stopInfo(address);
 
-	emit stopped();
+	emit stopped(this);
 }

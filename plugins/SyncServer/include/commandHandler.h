@@ -63,11 +63,15 @@ private:
     QMap<byte, unsigned int> m_pingMap;
 
 private:
+    //! Tracer message types.
+    enum MessageType
+    {
+        SENDSCENE, REQUESTSCENE,
+        UNKNOWN = 255
+    };
+
     void updatePingTimeouts(byte clientID, bool isServer);
     void checkPingTimeouts();
-signals:
-    //signal emitted when process is finished
-    void stopped();
 
 public slots:
     //execute operations

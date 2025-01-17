@@ -96,12 +96,6 @@ public:
 
     void CheckLocks(byte clientID);
 
-signals:
-    //!
-    //! Signal emitted when process is finished.
-    //!
-    void stopped();
-
 public slots:
     //!
     //! The broadcast thread's main worker loop.
