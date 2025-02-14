@@ -114,11 +114,6 @@ namespace DataHub {
         emit recordDataSignal(data);
     }
 
-    void Core::sceneReceive(QString ip)
-    {
-        emit sceneReceiveSignal(ip);
-    }
-
     void Core::loadPlugins()
     {
         // search for plugins

@@ -44,10 +44,10 @@ SceneReceiver::~SceneReceiver()
 void SceneReceiver::run()
 {
 	zmq::socket_t socket(*m_context, ZMQ_REQ);
-	socket.setsockopt(ZMQ_SNDTIMEO, 200);
+	//socket.setsockopt(ZMQ_SNDTIMEO, 200);
 
 	QString address = "tcp://" + m_IPadress + ":5555";
-	socket.bind(address.toLatin1().data());
+	socket.connect(address.toLatin1().data());
 
 	m_sceneData = new SceneDataHandler(m_IPadress, "./");
 
@@ -55,35 +55,40 @@ void SceneReceiver::run()
 
 	for (int i = 0; i < m_requests.count(); i++)
 	{
-		if (!socket.send(zmq::message_t(m_requests[i])))
+		if (!socket.send(zmq::message_t(m_requests[i].toStdString())))
 			continue;
 
 		zmq::message_t recvMessage;
 		socket.recv(recvMessage);
 
-		switch (i)
+		qDebug() << m_requests[i] << " " << recvMessage.size();
+
+		if (recvMessage.size() > 0)
 		{
-		case 1: // header
-			m_sceneData->headerByteData = QByteArray(static_cast<char*>(recvMessage.data()), static_cast<int>(recvMessage.size()));
-			break;
-		case 2: // nodes
-			m_sceneData->nodesByteData = QByteArray(static_cast<char*>(recvMessage.data()), static_cast<int>(recvMessage.size()));
-			break;
-		case 3: // parameterobjects
-			m_sceneData->parameterObjectsByteData = QByteArray(static_cast<char*>(recvMessage.data()), static_cast<int>(recvMessage.size()));
-			break;
-		case 4: // objects
-			m_sceneData->objectsByteData = QByteArray(static_cast<char*>(recvMessage.data()), static_cast<int>(recvMessage.size()));
-			break;
-		case 5: // characters
-			m_sceneData->characterByteData = QByteArray(static_cast<char*>(recvMessage.data()), static_cast<int>(recvMessage.size()));
-			break;
-		case 6: // textures
-			m_sceneData->texturesByteData = QByteArray(static_cast<char*>(recvMessage.data()), static_cast<int>(recvMessage.size()));
-			break;
-		case 7: // materials
-			m_sceneData->materialsByteData = QByteArray(static_cast<char*>(recvMessage.data()), static_cast<int>(recvMessage.size()));
-			break;
+			switch (i)
+			{
+			case 0: // header
+				m_sceneData->headerByteData = toByteArray(recvMessage);
+				break;
+			case 1: // nodes
+				m_sceneData->nodesByteData = toByteArray(recvMessage);
+				break;
+			case 2: // parameterobjects
+				m_sceneData->parameterObjectsByteData = toByteArray(recvMessage);
+				break;
+			case 3: // objects
+				m_sceneData->objectsByteData = toByteArray(recvMessage);
+				break;
+			case 4: // characters
+				m_sceneData->characterByteData = toByteArray(recvMessage);
+				break;
+			case 5: // textures
+				m_sceneData->texturesByteData = toByteArray(recvMessage);
+				break;
+			case 6: // materials
+				m_sceneData->materialsByteData = toByteArray(recvMessage);
+				break;
+			}
 		}
 	}
 

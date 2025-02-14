@@ -51,7 +51,7 @@ public:
     //! @param debug Flag determin wether debug informations shall be printed.
     //! @param context The ZMQ context used by the BroadcastHandler.
     //! 
-    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress, bool debug, bool webSockets, zmq::context_t* context) : m_core(core), m_IPadress(IPAdress), m_debug(debug), m_context(context) 
+    explicit ZeroMQHandler(DataHub::Core* core, QString IPAdress, bool debug, bool webSockets, zmq::context_t* context) : m_core(core), m_IPadress(IPAdress), m_debug(debug), m_context(context)
     {
         m_thread = new QThread(this);
         this->moveToThread(m_thread);

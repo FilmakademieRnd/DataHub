@@ -96,7 +96,7 @@ private:
 		{
 			QFile file(filePath);
 			file.open(QIODevice::WriteOnly);
-			file.write(data->data());
+			file.write(data->data(), data->size());
 			file.flush();
 			file.close();
 		}

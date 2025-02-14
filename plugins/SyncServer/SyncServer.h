@@ -57,6 +57,7 @@ namespace DataHub {
 	public:
 		virtual void run();
 		virtual void stop();
+		void requestScene(QString ip);
 
 	private:
 		QString m_ownIP;
@@ -77,9 +78,9 @@ namespace DataHub {
 		void initHandler(ZeroMQHandler *handler);
 		void cleanupHandler(ZeroMQHandler* handler);
 		void printHelp();
-
-	private slots:
-		void sceneReceive(QString ip);
+	
+	signals:
+		void sceneReceived();
 	};
 
 }

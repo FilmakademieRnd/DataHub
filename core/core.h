@@ -92,7 +92,7 @@ namespace DataHub {
 	public:
 		unsigned char m_time = 0;
 	private:
-		QMultiMap<QString, PluginInterface*> s_plugins;
+		QMap<QString, PluginInterface*> s_plugins;
 		QStringList m_cmdlineArgs;
 		TimerThread *m_tthread;
 		TimerThread *m_trandthread;
@@ -105,8 +105,13 @@ namespace DataHub {
 		QStringList getAppArguments();
 
 	public:
+		template <typename T>
+		T getPlugin()
+		{
+			QString typeName = QString(typeid(T).name()).split(" ")[1];
+			return (T) s_plugins[typeName];
+		}
 		void recordData(QByteArray data);
-		void sceneReceive(QString ip);
 
 	private slots:
 		void updateTime();

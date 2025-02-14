@@ -50,7 +50,6 @@ namespace DataHub {
 
     void SyncServer::init()
     {
-        connect(core(), &Core::sceneReceiveSignal, this, &SyncServer::sceneReceive);
     }
 
 	void SyncServer::run()
@@ -210,10 +209,13 @@ namespace DataHub {
         std::cout << "-nl:      run without lock history" << std::endl;
     }
 
-    void SyncServer::sceneReceive(QString ip)
+    void SyncServer::requestScene(QString ip)
     {
         m_sceneReceiver = new SceneReceiver(core(), ip, false, m_context);
+       
         QObject::connect(m_sceneReceiver, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
+        QObject::connect(m_sceneReceiver, &ZeroMQHandler::stopped, this, &SyncServer::sceneReceived);
+        
         m_sceneReceiver->requestStart();
     }
 }

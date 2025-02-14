@@ -53,6 +53,13 @@ private:
 	//!
 	QList<QString> m_requests;
     SceneDataHandler *m_sceneData;
+    QByteArray toByteArray(zmq::message_t& message) const
+    {
+        if (message.size() > 0)
+            return QByteArray(static_cast<char*>(message.data()), static_cast<qsizetype>(message.size()));
+        else
+            return QByteArray();
+    }
 
 public slots:
     //execute operations

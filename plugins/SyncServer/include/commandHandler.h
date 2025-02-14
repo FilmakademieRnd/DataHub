@@ -66,6 +66,7 @@ private:
     //! Tracer message types.
     enum MessageType
     {
+        CONNECTIONSTATUS,
         SENDSCENE, REQUESTSCENE,
         UNKNOWN = 255
     };
@@ -76,6 +77,7 @@ private:
 public slots:
     //execute operations
     void run();
+    void test();
 
 private slots:
     void tickTime(int time);

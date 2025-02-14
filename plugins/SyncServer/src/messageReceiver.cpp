@@ -69,10 +69,10 @@ void MessageReceiver::CheckLocks(byte clientID)
 void MessageReceiver::run()
 {
 	zmq::socket_t socket(*m_context, ZMQ_SUB);
-	QString address = m_addressPrefix + m_IPadress + m_addressPortBase + "7";
-	socket.bind(address.toLatin1().data());
 	socket.setsockopt(ZMQ_SUBSCRIBE, "client", 0);
 	socket.setsockopt(ZMQ_RCVTIMEO, 100);
+	QString address = m_addressPrefix + m_IPadress + m_addressPortBase + "7";
+	socket.bind(address.toLatin1().data());
 
 	zmq::pollitem_t item = { static_cast<void*>(socket), 0, ZMQ_POLLIN, 0 };
 
