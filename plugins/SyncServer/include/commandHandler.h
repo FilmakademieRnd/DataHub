@@ -67,7 +67,7 @@ private:
     enum MessageType
     {
         CONNECTIONSTATUS,
-        SENDSCENE, REQUESTSCENE,
+        SENDSCENE, REQUESTSCENE, SCENERECEIVED,
         UNKNOWN = 255
     };
 
@@ -77,7 +77,7 @@ private:
 public slots:
     //execute operations
     void run();
-    void test();
+    void sceneReceived();
 
 private slots:
     void tickTime(int time);

@@ -35,7 +35,7 @@ typedef unsigned char byte;
 class SceneDataHandler
 {
 public:
-	SceneDataHandler(QString serverID, QString path) : m_serverID(serverID), m_path(path) {}
+	SceneDataHandler()  {}
 
 public:
 	QByteArray headerByteData;
@@ -47,9 +47,14 @@ public:
 	QByteArray materialsByteData;
 
 public:
-	void writeToDisk()
+	void writeToDisk(QString path, QString serverID, QString stamp)
 	{
-		QString filePath = m_path + m_serverID;
+		QDir dir(path + serverID);
+		
+		if (!dir.exists())
+			dir.mkpath(".");
+
+		QString filePath = path + serverID + "/" + stamp;
 
 		writeFile(&headerByteData, filePath + "_header");
 		writeFile(&nodesByteData, filePath + "_nodesByteData");
@@ -60,9 +65,9 @@ public:
 		writeFile(&materialsByteData, filePath + "_materialsByteData");
 	}
 
-	void readFromDisk()
+	void readFromDisk(QString path, QString serverID, QString stamp)
 	{
-		QString filePath = m_path + m_serverID;
+		QString filePath = path + serverID + stamp;
 		
 		headerByteData = readFile(filePath + "_header");
 		nodesByteData = readFile(filePath + "_nodesByteData");
@@ -84,10 +89,6 @@ public:
 			texturesByteData.isEmpty() &&
 			materialsByteData.isEmpty();
 	}
-
-private:
-	QString m_serverID;
-	QString m_path;
 
 private:
 	void writeFile(QByteArray* data, QString filePath)

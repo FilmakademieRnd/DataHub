@@ -49,7 +49,7 @@ void SceneReceiver::run()
 	QString address = "tcp://" + m_IPadress + ":5555";
 	socket.connect(address.toLatin1().data());
 
-	m_sceneData = new SceneDataHandler(m_IPadress, "./");
+	m_sceneData = new SceneDataHandler();
 
 	startInfo(address);
 
@@ -57,6 +57,8 @@ void SceneReceiver::run()
 	{
 		if (!socket.send(zmq::message_t(m_requests[i].toStdString())))
 			continue;
+
+		qDebug() << "Request: " << m_requests[i];
 
 		zmq::message_t recvMessage;
 		socket.recv(recvMessage);
@@ -94,8 +96,7 @@ void SceneReceiver::run()
 
 	if (!m_sceneData->isEmpty())
 	{
-		//m_sceneData->serverID = m_IPadress;
-		m_sceneData->writeToDisk();
+		m_sceneData->writeToDisk("./", m_IPadress, QDateTime::currentDateTime().toString("dd-MM-yyyy_hh-mm-ss"));
 	}
 
 	// Set _working to false -> process cannot be aborted anymore

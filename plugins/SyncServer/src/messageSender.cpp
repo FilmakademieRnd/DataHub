@@ -33,7 +33,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 MessageSender::MessageSender(DataHub::Core* core, QString IPAdress, bool debug, bool webSockets, zmq::context_t* context) :
     ZeroMQHandler(core, IPAdress, debug, webSockets, context)
 {
-    connect(core, SIGNAL(tickSecondRandom(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
+	connect(core, SIGNAL(tickSecondRandom(int)), this, SLOT(createSyncMessage(int)), Qt::DirectConnection);
 }
 
 //!

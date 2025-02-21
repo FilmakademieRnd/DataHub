@@ -34,7 +34,7 @@ CommandHandler::CommandHandler(DataHub::Core* core, MessageSender* messageSender
 	: ZeroMQHandler(core, IPAdress, debug, false, context), m_sender(messageSender), m_receiver(messageReceiver)
 {
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(tickTime(int)), Qt::DirectConnection);
-	connect(core->getPlugin<DataHub::SyncServer*>(), SIGNAL(sceneReceived()), this, SLOT(test()), Qt::DirectConnection);
+	connect(core->getPlugin<DataHub::SyncServer*>(), SIGNAL(sceneReceived()), this, SLOT(sceneReceived()), Qt::DirectConnection);
 }
 
 void CommandHandler::tickTime(int time)
@@ -108,11 +108,20 @@ void CommandHandler::checkPingTimeouts()
 	m_mutex.unlock();
 }
 
-void CommandHandler::test()
+void CommandHandler::sceneReceived()
 {
-	//[SEIM] continue here !!!
+	m_mutex.lock();
 
-	int i = 1;
+	char newMessage[4];
+
+	newMessage[0] = m_targetHostID;
+	newMessage[1] = m_core->m_time;
+	newMessage[2] = MessageReceiver::MessageType::DATAHUB;
+	newMessage[3] = CommandHandler::MessageType::SCENERECEIVED;
+
+	m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 4)));
+
+	m_mutex.unlock();
 }
 
 void CommandHandler::run()
@@ -135,7 +144,6 @@ void CommandHandler::run()
 
 		zmq::message_t message;
 		socket.recv(&message);
-
 
 		if (message.size() > 0)
 		{
