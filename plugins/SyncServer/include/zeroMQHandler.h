@@ -75,6 +75,8 @@ public:
 		m_thread->quit();
 		m_thread->wait();
 
+        emit deleted(m_IPadress);
+
         delete m_thread;
 	}
 
@@ -169,6 +171,7 @@ signals:
     //! Signal emitted when process is finished.
     //!
     void stopped(ZeroMQHandler*);
+    void deleted(QString);
 
 public slots:
     //! Default thread worker loop.

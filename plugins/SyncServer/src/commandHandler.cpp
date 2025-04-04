@@ -29,12 +29,13 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include "CommandHandler.h"
 #include "../SyncServer.h"
+#include "sceneDataHandler.h"
 
 CommandHandler::CommandHandler(DataHub::Core* core, MessageSender* messageSender, MessageReceiver *messageReceiver, QString IPAdress, bool debug, zmq::context_t* context) 
 	: ZeroMQHandler(core, IPAdress, debug, false, context), m_sender(messageSender), m_receiver(messageReceiver)
 {
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(tickTime(int)), Qt::DirectConnection);
-	connect(core->getPlugin<DataHub::SyncServer*>(), SIGNAL(sceneReceived()), this, SLOT(sceneReceived()), Qt::DirectConnection);
+	connect(core->getPlugin<DataHub::SyncServer*>(), SIGNAL(sceneReceived(QString)), this, SLOT(sceneReceived(QString)), Qt::DirectConnection);
 }
 
 void CommandHandler::tickTime(int time)
@@ -108,18 +109,19 @@ void CommandHandler::checkPingTimeouts()
 	m_mutex.unlock();
 }
 
-void CommandHandler::sceneReceived()
+void CommandHandler::sceneReceived(QString senderIP)
 {
 	m_mutex.lock();
 
-	char newMessage[4];
+	char newMessage[5];
 
 	newMessage[0] = m_targetHostID;
 	newMessage[1] = m_core->m_time;
 	newMessage[2] = MessageReceiver::MessageType::DATAHUB;
 	newMessage[3] = CommandHandler::MessageType::SCENERECEIVED;
+	newMessage[4] = senderIP.section('.', 3, 3).toInt();
 
-	m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 4)));
+	m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 5)));
 
 	m_mutex.unlock();
 }
@@ -147,10 +149,11 @@ void CommandHandler::run()
 
 		if (message.size() > 0)
 		{
-			char responseMsg[3];
+			char responseMsg[4];
 			responseMsg[0] = m_targetHostID;
 			responseMsg[1] = m_core->m_time;
 			responseMsg[2] = MessageReceiver::MessageType::EMPTY;
+			responseMsg[3] = CommandHandler::MessageType::UNKNOWN;
 			
 			QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
 
@@ -162,7 +165,11 @@ void CommandHandler::run()
 			{
 			case MessageReceiver::MessageType::PING:
 			{
-				byte msgServer = msgArray[3];
+				byte msgServer = 0;
+				
+				if (msgArray.size() > 3)
+					byte msgServer = msgArray[3];
+
 				responseMsg[2] = MessageReceiver::MessageType::PING;
 
 				QThread::msleep(10);
@@ -183,8 +190,19 @@ void CommandHandler::run()
 					socket.send(responseMsg, 3);
 					break;
 				case CommandHandler::MessageType::SENDSCENE:
-					//m_core->sceneSend(m_IPadress.section('.', 0, 2) + "." + QString::number(clientID));
+					syncServer->sendScene(m_IPadress);
 					socket.send(responseMsg, 3);
+					break;
+				case CommandHandler::MessageType::FILEINFO:
+					responseMsg[3] = CommandHandler::MessageType::FILEINFO;
+					QList<QStringList> fileInfo = SceneDataHandler::infoFromDisk("./", m_IPadress.section('.', 0, 2) + "." + QString::number(clientID));
+					zmq::multipart_t fileInfoReply;
+					fileInfoReply.add(zmq::message_t(responseMsg, 4));
+					foreach(const QString &scenePartVersion, fileInfo[0])
+					{
+						fileInfoReply.addstr(scenePartVersion.toStdString());
+					}
+					zmq::send_multipart(socket, fileInfoReply);
 					break;
 				}
 			}
@@ -202,7 +220,6 @@ void CommandHandler::run()
 		QThread::yieldCurrentThread();
 	}
 
-	// Set _working to false -> process cannot be aborted anymore
 	m_mutex.lock();
 	m_working = false;
 	m_mutex.unlock();

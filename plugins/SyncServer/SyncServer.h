@@ -39,8 +39,8 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include <QThread>
 #include <QMutex>
 #include "plugininterface.h"
-#include "commandHandler.h"
-#include "sceneReceiver.h"
+#include "zeroMQHandler.h"
+
 
 
 namespace DataHub {
@@ -58,6 +58,7 @@ namespace DataHub {
 		virtual void run();
 		virtual void stop();
 		void requestScene(QString ip);
+		void sendScene(QString ip);
 
 	private:
 		QString m_ownIP;
@@ -68,7 +69,6 @@ namespace DataHub {
 		bool m_isRunning;
 		zmq::context_t *m_context;
 		QList<ZeroMQHandler*> m_handlerlist;
-		ZeroMQHandler *m_sceneReceiver;
 		
 	protected:
 		void init();
@@ -80,7 +80,8 @@ namespace DataHub {
 		void printHelp();
 	
 	signals:
-		void sceneReceived();
+		void sceneReceived(QString);
+		void sceneSend(QString);
 	};
 
 }

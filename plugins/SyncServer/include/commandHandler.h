@@ -67,7 +67,7 @@ private:
     enum MessageType
     {
         CONNECTIONSTATUS,
-        SENDSCENE, REQUESTSCENE, SCENERECEIVED,
+        SENDSCENE, REQUESTSCENE, SCENERECEIVED, FILEINFO,
         UNKNOWN = 255
     };
 
@@ -77,7 +77,7 @@ private:
 public slots:
     //execute operations
     void run();
-    void sceneReceived();
+    void sceneReceived(QString senderIP);
 
 private slots:
     void tickTime(int time);

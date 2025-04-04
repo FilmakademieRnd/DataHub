@@ -99,7 +99,6 @@ void SceneReceiver::run()
 		m_sceneData->writeToDisk("./", m_IPadress, QDateTime::currentDateTime().toString("dd-MM-yyyy_hh-mm-ss"));
 	}
 
-	// Set _working to false -> process cannot be aborted anymore
 	m_mutex.lock();
 	m_working = false;
 	m_mutex.unlock();

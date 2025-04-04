@@ -46,7 +46,32 @@ public:
 	QByteArray texturesByteData;
 	QByteArray materialsByteData;
 
+private:
+	inline static const QString headerString {"_header"};
+	inline static const QString nodesString {"_nodesByteData"};
+	inline static const QString parameterObjectsString {"_parameterObjectsByteData"};
+	inline static const QString objectsString {"_objectsByteData"};
+	inline static const QString characterString {"_characterByteData"};
+	inline static const QString texturesString {"_texturesByteData"};
+	inline static const QString materialsString {"_materialsByteData"};
+
 public:
+	static QList<QStringList> infoFromDisk(QString path, QString serverID)
+	{
+		QList<QStringList> returnvalue;
+
+		QDir dir(path + serverID + "/");
+		returnvalue.append(dir.entryList(QStringList() << "*" + headerString, QDir::Files));
+		returnvalue.append(dir.entryList(QStringList() << "*" + nodesString, QDir::Files));
+		returnvalue.append(dir.entryList(QStringList() << "*" + parameterObjectsString, QDir::Files));
+		returnvalue.append(dir.entryList(QStringList() << "*" + objectsString, QDir::Files));
+		returnvalue.append(dir.entryList(QStringList() << "*" + characterString, QDir::Files));
+		returnvalue.append(dir.entryList(QStringList() << "*" + texturesString, QDir::Files));
+		returnvalue.append(dir.entryList(QStringList() << "*" + materialsString, QDir::Files));
+
+		return returnvalue;
+	}
+
 	void writeToDisk(QString path, QString serverID, QString stamp)
 	{
 		QDir dir(path + serverID);
@@ -56,26 +81,28 @@ public:
 
 		QString filePath = path + serverID + "/" + stamp;
 
-		writeFile(&headerByteData, filePath + "_header");
-		writeFile(&nodesByteData, filePath + "_nodesByteData");
-		writeFile(&parameterObjectsByteData, filePath + "_parameterObjectsByteData");
-		writeFile(&objectsByteData, filePath + "_objectsByteData");
-		writeFile(&characterByteData, filePath + "_characterByteData");
-		writeFile(&texturesByteData, filePath + "_texturesByteData");
-		writeFile(&materialsByteData, filePath + "_materialsByteData");
+		writeFile(&headerByteData, filePath + headerString);
+		writeFile(&nodesByteData, filePath + nodesString);
+		writeFile(&parameterObjectsByteData, filePath + parameterObjectsString);
+		writeFile(&objectsByteData, filePath + objectsString);
+		writeFile(&characterByteData, filePath + characterString);
+		writeFile(&texturesByteData, filePath + texturesString);
+		writeFile(&materialsByteData, filePath + materialsString);
 	}
 
-	void readFromDisk(QString path, QString serverID, QString stamp)
+	void readFromDisk(QString path, QString serverID, int entryNbr)
 	{
-		QString filePath = path + serverID + stamp;
+		QList<QStringList> fileNames = infoFromDisk(path, serverID);
+
+		QString filePath = path + serverID + "/";
 		
-		headerByteData = readFile(filePath + "_header");
-		nodesByteData = readFile(filePath + "_nodesByteData");
-		parameterObjectsByteData = readFile(filePath + "_parameterObjectsByteData");
-		objectsByteData = readFile(filePath + "_objectsByteData");
-		characterByteData = readFile(filePath + "_characterByteData");
-		texturesByteData = readFile(filePath + "_texturesByteData");
-		materialsByteData = readFile(filePath + "_materialsByteData");
+		headerByteData = readFile(filePath, fileNames[0], 0);
+		nodesByteData = readFile(filePath, fileNames[1], 0);
+		parameterObjectsByteData = readFile(filePath, fileNames[2], 0);
+		objectsByteData = readFile(filePath, fileNames[3], 0);
+		characterByteData = readFile(filePath, fileNames[4], 0);
+		texturesByteData = readFile(filePath, fileNames[5], 0);
+		materialsByteData = readFile(filePath, fileNames[6], 0);
 	}
 
 	bool isEmpty()
@@ -109,6 +136,20 @@ private:
 		if (file.exists() && file.open(QIODevice::ReadOnly)) {
 			return file.readAll();
 		}
+		else return QByteArray();
+	}
+
+	QByteArray readFile(QString path, QStringList fileNames, int index)
+	{
+		QByteArray returnvalue;
+		if (!fileNames.isEmpty())
+		{
+			QFile file(path + "/" + fileNames[index]);
+			if (file.exists() && file.open(QIODevice::ReadOnly)) {
+				returnvalue = file.readAll();
+			}
+		}
+		return returnvalue;
 	}
 };
 

@@ -7,11 +7,13 @@ qt_add_library(${target_name} SHARED
 	src/messageSender.cpp
 	src/commandHandler.cpp
 	src/sceneReceiver.cpp
+	src/sceneSender.cpp
 	include/messageSender.h
 	include/messageReceiver.h
 	include/zeroMQHandler.h
 	include/commandHandler.h
 	include/sceneReceiver.h
+	include/sceneSender.h
 	include/sceneDataHandler.h
 )
 target_include_directories(${target_name} 

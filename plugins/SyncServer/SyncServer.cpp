@@ -35,7 +35,10 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include "SyncServer.h"
 #include "messageReceiver.h"
-#include "messagesender.h"
+#include "messageSender.h"
+#include "commandHandler.h"
+#include "sceneReceiver.h"
+#include "sceneSender.h"
 #include <QtNetwork/QNetworkInterface>
 #include <QtNetwork/QHostAddress>
 #include <iostream>
@@ -44,7 +47,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 namespace DataHub {
 
-    SyncServer::SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_isRunning(false)
+    SyncServer::SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_isRunning(false), m_webSockets(false)
     {
     }
 
@@ -211,11 +214,21 @@ namespace DataHub {
 
     void SyncServer::requestScene(QString ip)
     {
-        m_sceneReceiver = new SceneReceiver(core(), ip, false, m_context);
+        ZeroMQHandler *sceneReceiver = new SceneReceiver(core(), ip, false, m_context);
        
-        QObject::connect(m_sceneReceiver, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
-        QObject::connect(m_sceneReceiver, &ZeroMQHandler::stopped, this, &SyncServer::sceneReceived);
+        QObject::connect(sceneReceiver, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
+        QObject::connect(sceneReceiver, &ZeroMQHandler::deleted, this, &SyncServer::sceneReceived);
         
-        m_sceneReceiver->requestStart();
+        initHandler(sceneReceiver);
+    }
+
+    void SyncServer::sendScene(QString ip)
+    {
+        ZeroMQHandler* sceneSender = new SceneSender(core(), ip, false, m_context);
+
+        QObject::connect(sceneSender, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
+        QObject::connect(sceneSender, &ZeroMQHandler::deleted, this, &SyncServer::sceneSend);
+
+        initHandler(sceneSender);
     }
 }
