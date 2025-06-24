@@ -52,13 +52,72 @@ namespace DataHub {
 		Q_INTERFACES(DataHub::PluginInterface)
 
 	public:
-		SyncServer(); 
+		SyncServer();
 	
 	public:
+        typedef QPair<bool, byte> cID;
 		virtual void run();
 		virtual void stop();
 		void requestScene(QString ip);
-		void sendScene(QString ip);
+		void sendScene(QString ip, QString clientIP);
+
+		static int getIP(const byte clientID)
+		{
+			return m_clientIDs.key(cID(true, clientID), -1);
+		}
+
+		static int addClient(const int ip)
+		{
+			// hard limit of 250 clients revome old inactive clients first
+			if (m_clientIDs.size() > 249)
+			{
+				if (m_clientsInactive.size() > 0)
+					m_clientIDs.remove(m_clientsInactive.takeFirst());
+				else
+					return -1;
+			}
+
+			auto valueIter = m_clientIDs.find(ip);
+
+			if (valueIter != m_clientIDs.end())   // ip in list 
+			{
+				if (valueIter->first)    // ip active
+				{
+					return 0;
+				}
+				else   // if ip not active or lost then reactivate
+				{
+					m_clientsInactive.remove(ip);
+					valueIter->first = true;
+					return valueIter->second;
+				}
+			}
+			else  // add complete new client
+			{
+				int next = nextFreeID() + 1; // because 0 is DataHub
+				m_clientIDs.insert(ip, cID());
+				return next;
+			}
+		}
+
+		static bool removeClient(byte id)
+		{
+			int ip = getIP(id);
+
+			if (m_clientIDs.size() > 249) 
+			{
+				// remove oldest, inactive client
+				return m_clientIDs.remove(m_clientsInactive.takeFirst());
+			}
+			else if (ip > -1)
+			{
+				m_clientsInactive.append(ip);
+				m_clientIDs[ip].first = false;
+				return true;
+			}
+			else
+				return false;
+        }
 
 	private:
 		QString m_ownIP;
@@ -69,6 +128,28 @@ namespace DataHub {
 		bool m_isRunning;
 		zmq::context_t *m_context;
 		QList<ZeroMQHandler*> m_handlerlist;
+        static QHash<int, cID> m_clientIDs;
+		static QList<int> m_clientsInactive;
+
+        static byte nextFreeID()
+        {
+            int i = 0;
+
+            if (!m_clientIDs.empty())
+            {
+                const QList<cID> keys = m_clientIDs.values();
+                for (; i < keys.size() - 1; i++)
+                {
+                    if (keys[i + 1].second - keys[i].second > 1)
+                        break;
+                    i++;
+                }
+
+                i++;
+            }
+
+            return i;
+        }
 		
 	protected:
 		void init();

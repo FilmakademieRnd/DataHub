@@ -40,11 +40,11 @@ public:
 	//! Constructor
 	//! 
     //! @param core A reference to the DataHub core.
-    //! @param IPAdress The IP adress the SceneSender shall connect to. 
+    //! @param IPAddress The IP address the SceneSender shall connect to. 
     //! @param debug Flag determin wether debug informations shall be printed.
     //! @param context The ZMQ context used by the SceneSender.
     //! 
-    explicit SceneSender(DataHub::Core* core, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
+    explicit SceneSender(DataHub::Core* core, QString serverAddress = "", QString clientAddress = "", bool debug = false, zmq::context_t* context = NULL);
     ~SceneSender();
 
 private:
@@ -53,6 +53,7 @@ private:
 	//!
 	QMap<std::string, QByteArray*> m_responses;
     SceneDataHandler *m_sceneData;
+    QString m_clientAddress;
     bool loadData();
 
 

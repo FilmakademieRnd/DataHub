@@ -47,6 +47,10 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 namespace DataHub {
 
+    QHash<int, SyncServer::cID> SyncServer::m_clientIDs;
+    QList<int> SyncServer::m_clientsInactive;
+
+
     SyncServer::SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_isRunning(false), m_webSockets(false)
     {
     }
@@ -222,9 +226,9 @@ namespace DataHub {
         initHandler(sceneReceiver);
     }
 
-    void SyncServer::sendScene(QString ip)
+    void SyncServer::sendScene(QString ip, QString clientIP)
     {
-        ZeroMQHandler* sceneSender = new SceneSender(core(), ip, false, m_context);
+        ZeroMQHandler* sceneSender = new SceneSender(core(), ip, clientIP , false, m_context);
 
         QObject::connect(sceneSender, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
         QObject::connect(sceneSender, &ZeroMQHandler::deleted, this, &SyncServer::sceneSend);

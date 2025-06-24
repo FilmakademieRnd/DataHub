@@ -118,8 +118,11 @@ namespace DataHub {
     {
         // search for plugins
         QDir pluginsDir(QDir::currentPath() + "/plugins");
+#ifdef  Q_OS_WINDOWS
         pluginsDir.setNameFilters(QStringList() << "*.dll");
-
+#elif Q_OS_MACOS
+        pluginsDir.setNameFilters(QStringList() << "*.dylib");
+#endif   
         const QStringList entries = pluginsDir.entryList();
 
         for (const QString& fileName : entries) {

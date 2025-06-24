@@ -35,7 +35,7 @@ CommandHandler::CommandHandler(DataHub::Core* core, MessageSender* messageSender
 	: ZeroMQHandler(core, IPAdress, debug, false, context), m_sender(messageSender), m_receiver(messageReceiver)
 {
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(tickTime(int)), Qt::DirectConnection);
-	connect(core->getPlugin<DataHub::SyncServer*>(), SIGNAL(sceneReceived(QString)), this, SLOT(sceneReceived(QString)), Qt::DirectConnection);
+	connect(core->getPlugin<DataHub::SyncServer*>(), SIGNAL(broadcastSceneReceived(QString)), this, SLOT(broadcastSceneReceived(QString)), Qt::DirectConnection);
 }
 
 void CommandHandler::tickTime(int time)
@@ -58,18 +58,8 @@ void CommandHandler::updatePingTimeouts(byte clientID, bool isServer)
 	else
 	{
 		m_pingMap.insert(clientID, m_time);
-
-		char newMessage[7];
-
-		newMessage[0] = m_targetHostID;
-		newMessage[1] = m_core->m_time;
-		newMessage[2] = MessageReceiver::MessageType::DATAHUB;
-		newMessage[3] = CommandHandler::MessageType::CONNECTIONSTATUS;
-		newMessage[4] = 1; // new client registered
-		newMessage[5] = clientID; // new client ID
-		newMessage[6] = isServer; // is the new client a server
-
-		m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 7)));
+		
+		broadcastConnectionStatusUpdate(true, clientID, isServer);
 
 		qInfo() << "New client registered:" << clientID;
 	}
@@ -88,17 +78,7 @@ void CommandHandler::checkPingTimeouts()
 			byte clientID = m_pingMap.key(time);
 			m_pingMap.remove(clientID);
 
-			char newMessage[7];
-
-			newMessage[0] = m_targetHostID;
-			newMessage[1] = m_core->m_time;
-			newMessage[2] = MessageReceiver::MessageType::DATAHUB;
-			newMessage[3] = CommandHandler::MessageType::CONNECTIONSTATUS;
-			newMessage[4] = 0; // client lost
-			newMessage[5] = clientID; // new client ID
-			newMessage[6] = false; // always false
-
-			m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 7)));
+			broadcastConnectionStatusUpdate(false, clientID, false);
 
 			qInfo().nospace() << "Lost connection to client:" << clientID;
 
@@ -109,7 +89,22 @@ void CommandHandler::checkPingTimeouts()
 	m_mutex.unlock();
 }
 
-void CommandHandler::sceneReceived(QString senderIP)
+void CommandHandler::broadcastConnectionStatusUpdate(bool newClient, byte clientID, bool isServer)
+{
+	char newMessage[7];
+
+	newMessage[0] = m_targetHostID;
+	newMessage[1] = m_core->m_time;
+	newMessage[2] = ZeroMQHandler::MessageType::DATAHUB;
+	newMessage[3] = CommandHandler::MessageType::CONNECTIONSTATUS;
+	newMessage[4] = newClient; // client new or lost
+	newMessage[5] = clientID; // new client ID
+	newMessage[6] = isServer; // is the new client a server
+
+	m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 7)));
+}
+
+void CommandHandler::broadcastSceneReceived(QString senderIP)
 {
 	m_mutex.lock();
 
@@ -117,13 +112,45 @@ void CommandHandler::sceneReceived(QString senderIP)
 
 	newMessage[0] = m_targetHostID;
 	newMessage[1] = m_core->m_time;
-	newMessage[2] = MessageReceiver::MessageType::DATAHUB;
+	newMessage[2] = ZeroMQHandler::MessageType::DATAHUB;
 	newMessage[3] = CommandHandler::MessageType::SCENERECEIVED;
 	newMessage[4] = senderIP.section('.', 3, 3).toInt();
 
 	m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 5)));
 
 	m_mutex.unlock();
+}
+
+void CommandHandler::handlePingMessage(QByteArray& commandMessage, char* responseMessage)
+{
+	byte msgServer = 0;
+
+	if (commandMessage.size() > 3)
+		byte msgServer = commandMessage[3];
+
+	responseMessage[2] = CommandHandler::MessageType::PING;
+
+	QThread::msleep(10);
+
+	updatePingTimeouts(commandMessage[0], msgServer);
+}
+
+void CommandHandler::handleFileInfoMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t& multiResponseMessage)
+{
+	responseMessage[2] = CommandHandler::MessageType::FILEINFO;
+	QList<QStringList> fileInfo = SceneDataHandler::infoFromDisk("./", m_IPadress.section('.', 0, 2) + "." + QString::number(commandMessage[0]));
+	multiResponseMessage.add(zmq::message_t(responseMessage, 3));
+	
+	foreach(const QString & scenePartVersion, fileInfo[0])
+		multiResponseMessage.addstr(scenePartVersion.toStdString());
+}
+
+void CommandHandler::handleIPMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t& multiResponseMessage)
+{
+	responseMessage[2] = CommandHandler::MessageType::IP;
+	byte newClientID = DataHub::SyncServer::addClient(ipToInt(commandMessage[4], commandMessage[5], commandMessage[6], commandMessage[7]));
+	multiResponseMessage.add(zmq::message_t(responseMessage, 3));
+	multiResponseMessage.add(zmq::message_t(&newClientID, 1));
 }
 
 void CommandHandler::run()
@@ -149,69 +176,54 @@ void CommandHandler::run()
 
 		if (message.size() > 0)
 		{
-			char responseMsg[4];
+			char responseMsg[3];
 			responseMsg[0] = m_targetHostID;
 			responseMsg[1] = m_core->m_time;
-			responseMsg[2] = MessageReceiver::MessageType::EMPTY;
-			responseMsg[3] = CommandHandler::MessageType::UNKNOWN;
-			
+			responseMsg[2] = CommandHandler::MessageType::UNKNOWN;
+
 			QByteArray msgArray = QByteArray((char*)message.data(), static_cast<int>(message.size()));
 
 			byte clientID = msgArray[0];
 			byte msgTime = msgArray[1];
 			byte msgType = msgArray[2];
-			
+
+			QString clintIP = m_IPadress.section('.', 0, 2) + "." + QString::number(clientID);
+
 			switch (msgType)
 			{
-			case MessageReceiver::MessageType::PING:
-			{
-				byte msgServer = 0;
-				
-				if (msgArray.size() > 3)
-					byte msgServer = msgArray[3];
-
-				responseMsg[2] = MessageReceiver::MessageType::PING;
-
-				QThread::msleep(10);
-				socket.send(responseMsg, 3);
-
-				updatePingTimeouts(clientID, msgServer);
-
-				break;
-			}
-			case MessageReceiver::MessageType::DATAHUB:
-			{
-				responseMsg[2] = MessageReceiver::MessageType::DATAHUB;
-
-				switch (msgArray[3])
+				case CommandHandler::MessageType::PING:
 				{
+					handlePingMessage(msgArray, responseMsg);
+					socket.send(responseMsg, 3);
+
+					break;
+				}
 				case CommandHandler::MessageType::REQUESTSCENE:
-					syncServer->requestScene(m_IPadress.section('.', 0, 2) + "." + QString::number(clientID));
+					syncServer->requestScene(clintIP);
 					socket.send(responseMsg, 3);
 					break;
 				case CommandHandler::MessageType::SENDSCENE:
-					syncServer->sendScene(m_IPadress);
+					syncServer->sendScene(m_IPadress, clintIP);
 					socket.send(responseMsg, 3);
 					break;
 				case CommandHandler::MessageType::FILEINFO:
-					responseMsg[3] = CommandHandler::MessageType::FILEINFO;
-					QList<QStringList> fileInfo = SceneDataHandler::infoFromDisk("./", m_IPadress.section('.', 0, 2) + "." + QString::number(clientID));
+				{
 					zmq::multipart_t fileInfoReply;
-					fileInfoReply.add(zmq::message_t(responseMsg, 4));
-					foreach(const QString &scenePartVersion, fileInfo[0])
-					{
-						fileInfoReply.addstr(scenePartVersion.toStdString());
-					}
+					handleFileInfoMessage(msgArray, responseMsg, fileInfoReply);
 					zmq::send_multipart(socket, fileInfoReply);
 					break;
 				}
-			}
-			default:
-				break;
+				case CommandHandler::MessageType::IP:
+				{
+					zmq::multipart_t ipReply;
+					handleIPMessage(msgArray, responseMsg, ipReply);
+					zmq::send_multipart(socket, ipReply);
+					break;
+				}
+				default:
+					break;
 			}
 		}
-
-
 
 		if (stop) {
 			break;

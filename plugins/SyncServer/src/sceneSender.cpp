@@ -29,9 +29,10 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include "sceneSender.h"
 
-SceneSender::SceneSender(DataHub::Core* core, QString IPAdress, bool debug, zmq::context_t* context) 
-	: ZeroMQHandler(core, IPAdress, debug, false, context)
+SceneSender::SceneSender(DataHub::Core* core, QString serverAddress, QString clientAddress, bool debug, zmq::context_t* context)
+	: ZeroMQHandler(core, serverAddress, debug, false, context), m_clientAddress(clientAddress)
 {
+	m_sceneData = new SceneDataHandler();
 }
 
 SceneSender::~SceneSender()
@@ -41,8 +42,7 @@ SceneSender::~SceneSender()
 
 bool SceneSender::loadData()
 {
-	m_sceneData = new SceneDataHandler();
-	m_sceneData->readFromDisk("./", m_IPadress, 0 /*file list entry number*/);
+	m_sceneData->readFromDisk("./", m_clientAddress, 0 /*file list entry number*/);
 
 	if (m_sceneData->isEmpty())
 		false;

@@ -33,6 +33,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include <QMutex>
 #include <zmq.hpp>
 #include <zmq_addon.hpp>
+#include <QHostAddress>
 
 #include "core.h"
 
@@ -84,7 +85,7 @@ public:
 	enum MessageType
     {
         PARAMETERUPDATE, LOCK, // node
-        SYNC, PING, RESENDUPDATE, // sync
+        SYNC, RESENDUPDATE, // sync
         UNDOREDOADD, RESETOBJECT, // undo redo
         DATAHUB, // DataHub
         RPC, // RPC
@@ -164,7 +165,6 @@ protected:
 
  private:
      QThread *m_thread;
-
 
 signals:
     //!

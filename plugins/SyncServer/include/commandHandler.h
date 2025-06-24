@@ -62,22 +62,32 @@ private:
     //! The map storing the registered clients ping times.
     QMap<byte, unsigned int> m_pingMap;
 
+    static int ipToInt(byte first, byte second, byte third, byte fourth)
+    {
+        return (first << 24) | (second << 16) | (third << 8) | (fourth);
+    }
+
 private:
     //! Tracer message types.
     enum MessageType
     {
-        CONNECTIONSTATUS,
+        CONNECTIONSTATUS, IP, PING, 
         SENDSCENE, REQUESTSCENE, SCENERECEIVED, FILEINFO,
         UNKNOWN = 255
     };
 
     void updatePingTimeouts(byte clientID, bool isServer);
     void checkPingTimeouts();
+    void broadcastConnectionStatusUpdate(bool newClient, byte clientID, bool isServer);
+
+    void handlePingMessage(QByteArray& commandMessage, char* responseMessage);
+    void handleFileInfoMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t &multiResponseMessage);
+    void handleIPMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t &multiResponseMessage);
 
 public slots:
     //execute operations
     void run();
-    void sceneReceived(QString senderIP);
+    void broadcastSceneReceived(QString senderIP);
 
 private slots:
     void tickTime(int time);

@@ -17,6 +17,15 @@ set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
 set (i_targets DataHub)
 
+# assume built-in pthreads on MacOS
+IF(APPLE)
+    set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+    set(CMAKE_HAVE_THREADS_LIBRARY 1)
+    set(CMAKE_USE_WIN32_THREADS_INIT 0)
+    set(CMAKE_USE_PTHREADS_INIT 1)
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+ENDIF()
+
 add_subdirectory(core)
 add_subdirectory(plugins)
 add_subdirectory(application)
@@ -29,15 +38,17 @@ install(TARGETS $ENV{i_plugin_targets}
 		DESTINATION ${CMAKE_INSTALL_PREFIX}/bin/plugins
 )
 
+IF (NOT APPLE)
 qt_generate_deploy_app_script(
     TARGET SyncServer
-    FILENAME_VARIABLE deploy_script
+    OUTPUT_SCRIPT deploy_script
     NO_UNSUPPORTED_PLATFORM_ERROR
-#	NO_TRANSLATIONS
+	NO_TRANSLATIONS
 )
 install(SCRIPT ${deploy_script}
 	DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
+ENDIF()
 
 
 

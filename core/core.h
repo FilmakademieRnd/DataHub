@@ -108,8 +108,9 @@ namespace DataHub {
 		template <typename T>
 		T getPlugin()
 		{
-			QString typeName = QString(typeid(T).name()).split(" ")[1];
-			return (T) s_plugins[typeName];
+			QString tn = QMetaType::fromType<T>().name();
+			tn.chop(1);
+			return (T)s_plugins[tn];
 		}
 		void recordData(QByteArray data);
 
