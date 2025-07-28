@@ -49,9 +49,7 @@ void MessageSender::createSyncMessage(int time)
     m_syncMessage[2] = MessageType::SYNC;
     m_mutex.unlock();
 
-    std::cout << "\r" << "Time: " << time << " ";
-
-    //m_waitContition->wakeOne();
+    //std::cout << "\r" << "Time: " << time << " ";
 }
 
 //!

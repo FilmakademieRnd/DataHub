@@ -62,16 +62,11 @@ private:
     //! The map storing the registered clients ping times.
     QMap<byte, unsigned int> m_pingMap;
 
-    static int ipToInt(byte first, byte second, byte third, byte fourth)
-    {
-        return (first << 24) | (second << 16) | (third << 8) | (fourth);
-    }
-
 private:
     //! Tracer message types.
     enum MessageType
     {
-        CONNECTIONSTATUS, IP, PING, 
+        CONNECTIONSTATUS, ID, PING, 
         SENDSCENE, REQUESTSCENE, SCENERECEIVED, FILEINFO,
         UNKNOWN = 255
     };

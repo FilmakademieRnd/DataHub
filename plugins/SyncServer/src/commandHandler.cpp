@@ -30,24 +30,32 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include "CommandHandler.h"
 #include "../SyncServer.h"
 #include "sceneDataHandler.h"
+#include <iostream>
 
-CommandHandler::CommandHandler(DataHub::Core* core, MessageSender* messageSender, MessageReceiver *messageReceiver, QString IPAdress, bool debug, zmq::context_t* context) 
+
+using namespace DataHub;
+
+CommandHandler::CommandHandler(Core* core, MessageSender* messageSender, MessageReceiver *messageReceiver, QString IPAdress, bool debug, zmq::context_t* context) 
 	: ZeroMQHandler(core, IPAdress, debug, false, context), m_sender(messageSender), m_receiver(messageReceiver)
 {
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(tickTime(int)), Qt::DirectConnection);
-	connect(core->getPlugin<DataHub::SyncServer*>(), SIGNAL(broadcastSceneReceived(QString)), this, SLOT(broadcastSceneReceived(QString)), Qt::DirectConnection);
+	connect(core->getPlugin<SyncServer*>(), SIGNAL(broadcastSceneReceived(QString)), this, SLOT(broadcastSceneReceived(QString)), Qt::DirectConnection);
 }
 
 void CommandHandler::tickTime(int time)
 {
 	// increase local time for controlling client timeouts
 	m_time++;
+	std::cout << "\r" << "Time " << QDateTime::fromSecsSinceEpoch(m_time).toString("mm:ss").toStdString() << " ";
 
 	checkPingTimeouts();
 }
 
 void CommandHandler::updatePingTimeouts(byte clientID, bool isServer)
 {
+	if (clientID > 250)
+		return;
+
 	//update ping timeout
 	m_mutex.lock();
 	auto client = m_pingMap.find(clientID);
@@ -80,7 +88,9 @@ void CommandHandler::checkPingTimeouts()
 
 			broadcastConnectionStatusUpdate(false, clientID, false);
 
-			qInfo().nospace() << "Lost connection to client:" << clientID;
+			qInfo().nospace() << "Lost connection to client: " << clientID;
+
+			SyncServer::removeClient(clientID);
 
 			//check if client had lock
 			m_receiver->CheckLocks(clientID);
@@ -147,10 +157,13 @@ void CommandHandler::handleFileInfoMessage(QByteArray& commandMessage, char* res
 
 void CommandHandler::handleIPMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t& multiResponseMessage)
 {
-	responseMessage[2] = CommandHandler::MessageType::IP;
-	byte newClientID = DataHub::SyncServer::addClient(ipToInt(commandMessage[4], commandMessage[5], commandMessage[6], commandMessage[7]));
+	responseMessage[2] = CommandHandler::MessageType::ID;
+	
+	byte cID =  SyncServer::addClient(SyncServer::macToInt(commandMessage[3], commandMessage[4], commandMessage[5], commandMessage[6], commandMessage[7], commandMessage[8]));
+	qDebug().nospace() << "Client: " << cID << " checked" << " with MAC: " << QByteArray(commandMessage.sliced(3), 6).toHex(':');
+	
 	multiResponseMessage.add(zmq::message_t(responseMessage, 3));
-	multiResponseMessage.add(zmq::message_t(&newClientID, 1));
+	multiResponseMessage.add(zmq::message_t(&cID, 1));
 }
 
 void CommandHandler::run()
@@ -161,7 +174,7 @@ void CommandHandler::run()
 	QString address = "tcp://" + m_IPadress + ":5558";
 	socket.bind(address.toLatin1().data());
 
-	DataHub::SyncServer* syncServer = m_core->getPlugin<DataHub::SyncServer*>();
+	SyncServer* syncServer = m_core->getPlugin<SyncServer*>();
 
 	startInfo(address);
 
@@ -187,8 +200,6 @@ void CommandHandler::run()
 			byte msgTime = msgArray[1];
 			byte msgType = msgArray[2];
 
-			QString clintIP = m_IPadress.section('.', 0, 2) + "." + QString::number(clientID);
-
 			switch (msgType)
 			{
 				case CommandHandler::MessageType::PING:
@@ -199,11 +210,11 @@ void CommandHandler::run()
 					break;
 				}
 				case CommandHandler::MessageType::REQUESTSCENE:
-					syncServer->requestScene(clintIP);
+					syncServer->requestScene(clientID);
 					socket.send(responseMsg, 3);
 					break;
 				case CommandHandler::MessageType::SENDSCENE:
-					syncServer->sendScene(m_IPadress, clintIP);
+					syncServer->sendScene(m_IPadress, clientID);
 					socket.send(responseMsg, 3);
 					break;
 				case CommandHandler::MessageType::FILEINFO:
@@ -213,7 +224,7 @@ void CommandHandler::run()
 					zmq::send_multipart(socket, fileInfoReply);
 					break;
 				}
-				case CommandHandler::MessageType::IP:
+				case CommandHandler::MessageType::ID:
 				{
 					zmq::multipart_t ipReply;
 					handleIPMessage(msgArray, responseMsg, ipReply);

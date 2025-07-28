@@ -47,8 +47,8 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 namespace DataHub {
 
-    QHash<int, SyncServer::cID> SyncServer::m_clientIDs;
-    QList<int> SyncServer::m_clientsInactive;
+    QHash<int64_t, SyncServer::cID> SyncServer::m_clientIDs;
+    QList<int64_t> SyncServer::m_clientsInactive;
 
 
     SyncServer::SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_isRunning(false), m_webSockets(false)
@@ -216,9 +216,10 @@ namespace DataHub {
         std::cout << "-nl:      run without lock history" << std::endl;
     }
 
-    void SyncServer::requestScene(QString ip)
+    void SyncServer::requestScene(byte clientID)
     {
-        ZeroMQHandler *sceneReceiver = new SceneReceiver(core(), ip, false, m_context);
+        QString cip = getIPString(clientID);
+        ZeroMQHandler *sceneReceiver = new SceneReceiver(core(), cip, false, m_context);
        
         QObject::connect(sceneReceiver, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
         QObject::connect(sceneReceiver, &ZeroMQHandler::deleted, this, &SyncServer::sceneReceived);
@@ -226,9 +227,10 @@ namespace DataHub {
         initHandler(sceneReceiver);
     }
 
-    void SyncServer::sendScene(QString ip, QString clientIP)
+    void SyncServer::sendScene(QString ip, byte clientID)
     {
-        ZeroMQHandler* sceneSender = new SceneSender(core(), ip, clientIP , false, m_context);
+        QString cip = getMACString(clientID);
+        ZeroMQHandler* sceneSender = new SceneSender(core(), ip, cip , false, m_context);
 
         QObject::connect(sceneSender, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
         QObject::connect(sceneSender, &ZeroMQHandler::deleted, this, &SyncServer::sceneSend);
