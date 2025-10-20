@@ -39,7 +39,6 @@ CommandHandler::CommandHandler(Core* core, MessageSender* messageSender, Message
 	: ZeroMQHandler(core, IPAdress, debug, false, context), m_sender(messageSender), m_receiver(messageReceiver)
 {
 	connect(core, SIGNAL(tickSecond(int)), this, SLOT(tickTime(int)), Qt::DirectConnection);
-	connect(core->getPlugin<SyncServer*>(), SIGNAL(broadcastSceneReceived(QString)), this, SLOT(broadcastSceneReceived(QString)), Qt::DirectConnection);
 }
 
 void CommandHandler::tickTime(int time)
@@ -114,23 +113,6 @@ void CommandHandler::broadcastConnectionStatusUpdate(bool newClient, byte client
 	m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 7)));
 }
 
-void CommandHandler::broadcastSceneReceived(QString senderIP)
-{
-	m_mutex.lock();
-
-	char newMessage[5];
-
-	newMessage[0] = m_targetHostID;
-	newMessage[1] = m_core->m_time;
-	newMessage[2] = ZeroMQHandler::MessageType::DATAHUB;
-	newMessage[3] = CommandHandler::MessageType::SCENERECEIVED;
-	newMessage[4] = senderIP.section('.', 3, 3).toInt();
-
-	m_sender->QueBroadcastMessage(std::move(zmq::message_t(newMessage, 5)));
-
-	m_mutex.unlock();
-}
-
 void CommandHandler::handlePingMessage(QByteArray& commandMessage, char* responseMessage)
 {
 	byte msgServer = 0;
@@ -145,14 +127,19 @@ void CommandHandler::handlePingMessage(QByteArray& commandMessage, char* respons
 	updatePingTimeouts(commandMessage[0], msgServer);
 }
 
-void CommandHandler::handleFileInfoMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t& multiResponseMessage)
+void CommandHandler::handleFileInfoMessage(byte clientID, char* responseMessage, zmq::multipart_t& multiResponseMessage)
 {
 	responseMessage[2] = CommandHandler::MessageType::FILEINFO;
-	QList<QStringList> fileInfo = SceneDataHandler::infoFromDisk("./", m_IPadress.section('.', 0, 2) + "." + QString::number(commandMessage[0]));
+	QString serverID = SyncServer::getMACString(clientID);
+	QList<QStringList> fileInfo = SceneDataHandler::infoFromDisk("./", serverID);
+	QList<QByteArray> thumbnails = SceneDataHandler::readPackagesFromDisk("./", serverID, 1);
 	multiResponseMessage.add(zmq::message_t(responseMessage, 3));
 	
-	foreach(const QString & scenePartVersion, fileInfo[0])
-		multiResponseMessage.addstr(scenePartVersion.toStdString());
+	for (int i = 0; i < fileInfo[0].size(); i++)
+	{
+		multiResponseMessage.addstr(fileInfo[0][i].split(".")[0].toStdString());
+		multiResponseMessage.add(zmq::message_t(thumbnails[i].constData(), thumbnails[i].size()));
+	}
 }
 
 void CommandHandler::handleIPMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t& multiResponseMessage)
@@ -214,13 +201,13 @@ void CommandHandler::run()
 					socket.send(responseMsg, 3);
 					break;
 				case CommandHandler::MessageType::SENDSCENE:
-					syncServer->sendScene(m_IPadress, clientID);
+					syncServer->sendScene(clientID, msgArray[3]);
 					socket.send(responseMsg, 3);
 					break;
 				case CommandHandler::MessageType::FILEINFO:
 				{
 					zmq::multipart_t fileInfoReply;
-					handleFileInfoMessage(msgArray, responseMsg, fileInfoReply);
+					handleFileInfoMessage(clientID, responseMsg, fileInfoReply);
 					zmq::send_multipart(socket, fileInfoReply);
 					break;
 				}

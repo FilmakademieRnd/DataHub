@@ -8,6 +8,7 @@ qt_add_library(${target_name} SHARED
 	src/commandHandler.cpp
 	src/sceneReceiver.cpp
 	src/sceneSender.cpp
+	src/sceneBroker.cpp
 	include/messageSender.h
 	include/messageReceiver.h
 	include/zeroMQHandler.h
@@ -15,6 +16,7 @@ qt_add_library(${target_name} SHARED
 	include/sceneReceiver.h
 	include/sceneSender.h
 	include/sceneDataHandler.h
+	include/sceneBroker.h
 )
 target_include_directories(${target_name} 
     INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}

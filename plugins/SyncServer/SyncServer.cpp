@@ -39,6 +39,7 @@ any part thereof, the company/individual will have to contact Filmakademie
 #include "commandHandler.h"
 #include "sceneReceiver.h"
 #include "sceneSender.h"
+#include "sceneBroker.h"
 #include <QtNetwork/QNetworkInterface>
 #include <QtNetwork/QHostAddress>
 #include <iostream>
@@ -53,6 +54,7 @@ namespace DataHub {
 
     SyncServer::SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_isRunning(false), m_webSockets(false)
     {
+        m_brokerHandler = nullptr;
     }
 
     void SyncServer::init()
@@ -151,15 +153,19 @@ namespace DataHub {
 	}
 
     void SyncServer::stop()
-    {
-        foreach (ZeroMQHandler *handler, m_handlerlist)
-        {
-            cleanupHandler(handler);
-        }
+	{
+		foreach(ZeroMQHandler * handler, m_handlerlist)
+		{
+			cleanupHandler(handler);
+		}
 
-        m_context->shutdown();
-        m_context->close();
-    }
+		m_brokerHandler->requestStop();
+
+		m_context->shutdown();
+		m_context->close();
+		
+        delete m_brokerHandler;
+	}
 
     void SyncServer::initServer()
     {
@@ -190,6 +196,10 @@ namespace DataHub {
             initHandler(messageReceiverWS);
         }
 
+        //[SEIM Deactivated because of SceneServer problems]
+        m_brokerHandler = new SceneBroker(core(), m_ownIP, m_debug, m_context);
+        m_brokerHandler->requestStart();
+
         m_isRunning = true;
     }
 
@@ -218,19 +228,20 @@ namespace DataHub {
 
     void SyncServer::requestScene(byte clientID)
     {
-        QString cip = getIPString(clientID);
-        ZeroMQHandler *sceneReceiver = new SceneReceiver(core(), cip, false, m_context);
-       
+
+        QString cID = getMACString(clientID);
+        ZeroMQHandler* sceneReceiver = new SceneReceiver(core(), cID, false, m_context);
+
         QObject::connect(sceneReceiver, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
         QObject::connect(sceneReceiver, &ZeroMQHandler::deleted, this, &SyncServer::sceneReceived);
-        
+
         initHandler(sceneReceiver);
     }
 
-    void SyncServer::sendScene(QString ip, byte clientID)
+    void SyncServer::sendScene(byte clientID, byte fileListNbr)
     {
-        QString cip = getMACString(clientID);
-        ZeroMQHandler* sceneSender = new SceneSender(core(), ip, cip , false, m_context);
+        QString cID = getMACString(clientID);
+        ZeroMQHandler* sceneSender = new SceneSender(core(), cID , fileListNbr, false, m_context);
 
         QObject::connect(sceneSender, &ZeroMQHandler::stopped, this, &SyncServer::cleanupHandler);
         QObject::connect(sceneSender, &ZeroMQHandler::deleted, this, &SyncServer::sceneSend);

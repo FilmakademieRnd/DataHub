@@ -35,10 +35,21 @@ typedef unsigned char byte;
 class SceneDataHandler
 {
 public:
-	SceneDataHandler()  {}
+	~SceneDataHandler()  
+	{
+		headerByteData.clear();
+		thumbnailByteData.clear();
+		nodesByteData.clear();
+		parameterObjectsByteData.clear();
+		objectsByteData.clear();
+		characterByteData.clear();
+		texturesByteData.clear();
+		materialsByteData.clear();
+	}
 
 public:
 	QByteArray headerByteData;
+	QByteArray thumbnailByteData;
 	QByteArray nodesByteData;
 	QByteArray parameterObjectsByteData;
 	QByteArray objectsByteData;
@@ -47,13 +58,14 @@ public:
 	QByteArray materialsByteData;
 
 private:
-	inline static const QString headerString {"_header"};
-	inline static const QString nodesString {"_nodesByteData"};
-	inline static const QString parameterObjectsString {"_parameterObjectsByteData"};
-	inline static const QString objectsString {"_objectsByteData"};
-	inline static const QString characterString {"_characterByteData"};
-	inline static const QString texturesString {"_texturesByteData"};
-	inline static const QString materialsString {"_materialsByteData"};
+	inline static const QString headerString {".header"};
+	inline static const QString thumbnailString {".jpg"};
+	inline static const QString nodesString {".nodesByteData"};
+	inline static const QString parameterObjectsString {".parameterObjectsByteData"};
+	inline static const QString objectsString {".objectsByteData"};
+	inline static const QString characterString {".characterByteData"};
+	inline static const QString texturesString {".texturesByteData"};
+	inline static const QString materialsString {".materialsByteData"};
 
 public:
 	static QList<QStringList> infoFromDisk(QString path, QString serverID)
@@ -62,6 +74,7 @@ public:
 
 		QDir dir(path + serverID + "/");
 		returnvalue.append(dir.entryList(QStringList() << "*" + headerString, QDir::Files));
+		returnvalue.append(dir.entryList(QStringList() << "*" + thumbnailString, QDir::Files));
 		returnvalue.append(dir.entryList(QStringList() << "*" + nodesString, QDir::Files));
 		returnvalue.append(dir.entryList(QStringList() << "*" + parameterObjectsString, QDir::Files));
 		returnvalue.append(dir.entryList(QStringList() << "*" + objectsString, QDir::Files));
@@ -72,16 +85,30 @@ public:
 		return returnvalue;
 	}
 
-	void writeToDisk(QString path, QString serverID, QString stamp)
+	static QList<QByteArray> readPackagesFromDisk(QString path, QString serverID, int package = 0)
 	{
-		QDir dir(path + serverID);
+		QList<QStringList> fileNames = infoFromDisk(path, serverID);
+
+		QString filePath = path + serverID + "/";
+		QList<QByteArray> thumbnails;
+
+		foreach(QString fileName, fileNames[package])
+			thumbnails.append(readFile(filePath, fileName));
+
+		return thumbnails;
+	}
+
+	void writeToDisk(QString path, QString senderID, QString stamp)
+	{
+		QDir dir(path + senderID);
 		
 		if (!dir.exists())
 			dir.mkpath(".");
 
-		QString filePath = path + serverID + "/" + stamp;
+		QString filePath = path + senderID + "/" + stamp;
 
 		writeFile(&headerByteData, filePath + headerString);
+		writeFile(&thumbnailByteData, filePath + thumbnailString);
 		writeFile(&nodesByteData, filePath + nodesString);
 		writeFile(&parameterObjectsByteData, filePath + parameterObjectsString);
 		writeFile(&objectsByteData, filePath + objectsString);
@@ -90,22 +117,23 @@ public:
 		writeFile(&materialsByteData, filePath + materialsString);
 	}
 
-	void readFromDisk(QString path, QString serverID, int entryNbr)
+	void readFromDisk(QString path, QString serverID, int entryNbr = 0)
 	{
 		QList<QStringList> fileNames = infoFromDisk(path, serverID);
 
 		QString filePath = path + serverID + "/";
 		
-		headerByteData = readFile(filePath, fileNames[0], 0);
-		nodesByteData = readFile(filePath, fileNames[1], 0);
-		parameterObjectsByteData = readFile(filePath, fileNames[2], 0);
-		objectsByteData = readFile(filePath, fileNames[3], 0);
-		characterByteData = readFile(filePath, fileNames[4], 0);
-		texturesByteData = readFile(filePath, fileNames[5], 0);
-		materialsByteData = readFile(filePath, fileNames[6], 0);
+		headerByteData = readFile(filePath, fileNames[0], entryNbr);
+		thumbnailByteData = readFile(filePath, fileNames[1], entryNbr);
+		nodesByteData = readFile(filePath, fileNames[2], entryNbr);
+		parameterObjectsByteData = readFile(filePath, fileNames[3], entryNbr);
+		objectsByteData = readFile(filePath, fileNames[4], entryNbr);
+		characterByteData = readFile(filePath, fileNames[5], entryNbr);
+		texturesByteData = readFile(filePath, fileNames[6], entryNbr);
+		materialsByteData = readFile(filePath, fileNames[7], entryNbr);
 	}
 
-	bool isEmpty()
+	bool isComplete()
 	{
 		return
 			headerByteData.isEmpty() &&
@@ -139,17 +167,26 @@ private:
 		else return QByteArray();
 	}
 
-	QByteArray readFile(QString path, QStringList fileNames, int index)
+	static QByteArray readFile(QString path, QStringList fileNames, int index)
 	{
-		QByteArray returnvalue;
-		if (!fileNames.isEmpty())
+		if (fileNames.size() > index)
 		{
 			QFile file(path + "/" + fileNames[index]);
 			if (file.exists() && file.open(QIODevice::ReadOnly)) {
-				returnvalue = file.readAll();
+				return file.readAll();
 			}
 		}
-		return returnvalue;
+		else
+			return QByteArray();
+	}
+
+	static QByteArray readFile(QString path, QString fileName)
+	{
+		QFile file(path + "/" + fileName);
+		if (file.exists() && file.open(QIODevice::ReadOnly)) {
+			return file.readAll();
+		}
+		return QByteArray();
 	}
 };
 

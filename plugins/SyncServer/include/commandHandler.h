@@ -67,7 +67,7 @@ private:
     enum MessageType
     {
         CONNECTIONSTATUS, ID, PING, 
-        SENDSCENE, REQUESTSCENE, SCENERECEIVED, FILEINFO,
+        SENDSCENE, REQUESTSCENE, FILEINFO,
         UNKNOWN = 255
     };
 
@@ -76,13 +76,12 @@ private:
     void broadcastConnectionStatusUpdate(bool newClient, byte clientID, bool isServer);
 
     void handlePingMessage(QByteArray& commandMessage, char* responseMessage);
-    void handleFileInfoMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t &multiResponseMessage);
+    void handleFileInfoMessage(byte clientID, char* responseMessage, zmq::multipart_t &multiResponseMessage);
     void handleIPMessage(QByteArray& commandMessage, char* responseMessage, zmq::multipart_t &multiResponseMessage);
 
 public slots:
     //execute operations
     void run();
-    void broadcastSceneReceived(QString senderIP);
 
 private slots:
     void tickTime(int time);

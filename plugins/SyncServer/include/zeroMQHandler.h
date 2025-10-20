@@ -59,7 +59,7 @@ public:
         QObject::connect(m_thread, &QThread::started, this, &ZeroMQHandler::run);
 
         m_stop = false;
-        m_working = false;
+        m_working = true;
 
         if (webSockets) {
             m_addressPrefix = "ws://";
@@ -71,7 +71,7 @@ public:
         }
     }
 
-	~ZeroMQHandler()
+	~ZeroMQHandler() 
 	{
 		m_thread->quit();
 		m_thread->wait();
@@ -163,7 +163,7 @@ protected:
         qInfo() << metaObject()->className() << msg << " stopped";// in Thread "<<thread()->currentThreadId();
     }
 
- private:
+ protected:
      QThread *m_thread;
 
 signals:
@@ -177,7 +177,7 @@ public slots:
     //! Default thread worker loop.
     virtual void run() = 0;
     //! Request this process to stop working.
-    void requestStop()
+    void virtual requestStop()
     {
        m_mutex.lock();
        m_stop = true;

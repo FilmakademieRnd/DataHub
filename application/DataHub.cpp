@@ -71,9 +71,9 @@ int main(int argc, char** argv)
 	DataHubApp  a(argc, argv);
 
 	signal(SIGINT, sigHandler);
-#ifdef Q_OS_WINDOWS
+//#ifdef Q_OS_WINDOWS
 	signal(SIGTERM, sigHandler);
-#endif
+//#endif
 	signal(SIGBREAK, sigHandler);
 	signal(SIGABRT, sigHandler);
 

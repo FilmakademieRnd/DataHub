@@ -29,50 +29,50 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include "sceneSender.h"
 
-SceneSender::SceneSender(DataHub::Core* core, QString serverAddress, QString clientAddress, bool debug, zmq::context_t* context)
-	: ZeroMQHandler(core, serverAddress, debug, false, context), m_clientAddress(clientAddress)
+SceneSender::SceneSender(DataHub::Core* core, QString clientAddress, int fileListNbr, bool debug, zmq::context_t* context)
+	: ZeroMQHandler(core, "0.0.0.0", debug, false, context), m_clientAddress(clientAddress), m_fileListNbr(fileListNbr)
 {
-	m_sceneData = new SceneDataHandler();
+	//m_sceneData = new SceneDataHandler();
 }
 
 SceneSender::~SceneSender()
 {
-	delete m_sceneData;
+	//m_responses.clear();
+	//delete m_sceneData;
 }
 
-bool SceneSender::loadData()
+bool SceneSender::loadData(int fileListNbr)
 {
-	m_sceneData->readFromDisk("./", m_clientAddress, 0 /*file list entry number*/);
+	m_sceneData.readFromDisk("./", m_clientAddress, fileListNbr);
 
-	if (m_sceneData->isEmpty())
-		false;
-
-	m_responses.insert("header", &m_sceneData->headerByteData);
-	m_responses.insert("nodes", &m_sceneData->nodesByteData);
-	m_responses.insert("parameterobjects", &m_sceneData->parameterObjectsByteData);
-	m_responses.insert("objects", &m_sceneData->objectsByteData);
-	m_responses.insert("characters", &m_sceneData->characterByteData);
-	m_responses.insert("textures", &m_sceneData->texturesByteData);
-	m_responses.insert("materials", &m_sceneData->materialsByteData);
+	m_responses.insert("header", &m_sceneData.headerByteData);
+	//m_responses.insert("thumbnail", &m_sceneData.thumbnailByteData);  // currently not requested by TRACER (Beware, thread will not stop if activated!)
+	m_responses.insert("nodes", &m_sceneData.nodesByteData);
+	m_responses.insert("parameterobjects", &m_sceneData.parameterObjectsByteData);
+	m_responses.insert("objects", &m_sceneData.objectsByteData);
+	m_responses.insert("characters", &m_sceneData.characterByteData);
+	m_responses.insert("textures", &m_sceneData.texturesByteData);
+	m_responses.insert("materials", &m_sceneData.materialsByteData);
 
 	return true;
 }
 
-
 void SceneSender::run()
 {
-	if (!loadData()) {
+	if (!loadData(m_fileListNbr)) {
 		qInfo("Error loading Scene Files!");
 		return;
 	}
 
 	zmq::socket_t socket(*m_context, ZMQ_REP);
-	//socket.setsockopt(ZMQ_RCVTIMEO, 100);
+	//socket.setsockopt(ZMQ_RCVTIMEO, 1000);
 
-	QString address = "tcp://" + m_IPadress + ":5555";
-	socket.bind(address.toLatin1().data());
+	//QString address = "tcp://" + m_IPadress + ":5555";
+	QString address = "inproc://TransceiverWorkers";
+	socket.connect(address.toLatin1().data());
 
 	startInfo(address);
+	int packageCount = 0;
 
 	while (true) {
 		// checks if process should be aborted
@@ -87,24 +87,29 @@ void SceneSender::run()
 		{
 			std::string request = message.to_string();
 			
-			qInfo() << "Received request: " << request;
+			qInfo() << "Received request:" << request;
 			
-			auto response = m_responses.find(request);
+			QMap<std::string, QByteArray*>::const_iterator response = m_responses.find(request);
 			if (response != m_responses.end())
 			{
-				const QByteArray* dataArray = response.value();
-				socket.send(zmq::message_t(dataArray->data(), dataArray->size()));
-
-				qInfo() << request << " with size: " << dataArray->size() << + " sended.";
+				QByteArray* dataArray = response.value();
+				socket.send(dataArray->data(), dataArray->size());
+				packageCount++;
+				qInfo() << request << "with size:" << dataArray->size() << + "sended.";
+			}
+			else {
+				qInfo() << "Requested package" << request << "not part of the scene!";
+				break;
 			}
 		}
 
-		if (stop) {
+		if (packageCount == m_responses.size() || stop)
 			break;
-		}
 
 		QThread::yieldCurrentThread();
 	}
+
+	m_responses.clear();
 
 	m_mutex.lock();
 	m_working = false;

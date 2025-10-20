@@ -74,7 +74,7 @@ void MessageReceiver::run()
 	QString address = m_addressPrefix + m_IPadress + m_addressPortBase + "7";
 	socket.bind(address.toLatin1().data());
 
-	zmq::pollitem_t item = { static_cast<void*>(socket), 0, ZMQ_POLLIN, 0 };
+	//zmq::pollitem_t item = { static_cast<void*>(socket), 0, ZMQ_POLLIN, 0 };
 
 	startInfo(address);
 

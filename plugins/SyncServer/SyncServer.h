@@ -59,7 +59,7 @@ namespace DataHub {
 		virtual void run();
 		virtual void stop();
 		void requestScene(byte clientID);
-		void sendScene(QString ip, byte clientID);
+		void sendScene(byte clientID, byte fileListNbr);
 
 		static int addClient(const int64_t mac)
 		{
@@ -160,12 +160,12 @@ namespace DataHub {
 			bytes[4] = (mac >> 8) & 0xFF;
 			bytes[5] = mac & 0xFF;
 
-			return QString::number(bytes[0]) + 
-				"." + QString::number(bytes[1]) + 
-				"." + QString::number(bytes[2]) + 
-				"." + QString::number(bytes[3]);
-				"." + QString::number(bytes[4]);
-				"." + QString::number(bytes[5]);
+			return QString::number(bytes[0], 16) + 
+				"." + QString::number(bytes[1], 16) + 
+				"." + QString::number(bytes[2], 16) + 
+				"." + QString::number(bytes[3], 16) +
+				"." + QString::number(bytes[4], 16) +
+				"." + QString::number(bytes[5], 16);
 		}
 
 	private:
@@ -176,6 +176,7 @@ namespace DataHub {
 		bool m_paramHistory;
 		bool m_isRunning;
 		zmq::context_t *m_context;
+		ZeroMQHandler* m_brokerHandler;
 		QList<ZeroMQHandler*> m_handlerlist;
         static QHash<int64_t, cID> m_clientIDs;
 		static QList<int64_t> m_clientsInactive;
@@ -201,6 +202,7 @@ namespace DataHub {
             return i;
         }
 
+	public:
 		static int64_t getMacInt(const byte clientID)
 		{
 			return m_clientIDs.key(cID(true, clientID), -1);

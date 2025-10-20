@@ -44,7 +44,7 @@ public:
     //! @param debug Flag determin wether debug informations shall be printed.
     //! @param context The ZMQ context used by the SceneSender.
     //! 
-    explicit SceneSender(DataHub::Core* core, QString serverAddress = "", QString clientAddress = "", bool debug = false, zmq::context_t* context = NULL);
+    explicit SceneSender(DataHub::Core* core, QString clientAddress = "", int fileListNbr = 0, bool debug = false, zmq::context_t* context = NULL);
     ~SceneSender();
 
 private:
@@ -52,9 +52,10 @@ private:
 	//! The list of request the reqester uses to request the packages.
 	//!
 	QMap<std::string, QByteArray*> m_responses;
-    SceneDataHandler *m_sceneData;
+    SceneDataHandler m_sceneData;
     QString m_clientAddress;
-    bool loadData();
+    int m_fileListNbr;
+    bool loadData(int fileListNbr);
 
 
 public slots:

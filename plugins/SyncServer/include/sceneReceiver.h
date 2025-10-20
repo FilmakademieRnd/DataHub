@@ -44,15 +44,16 @@ public:
     //! @param debug Flag determin wether debug informations shall be printed.
     //! @param context The ZMQ context used by the SceneReceiver.
     //! 
-    explicit SceneReceiver(DataHub::Core* core, QString IPAdress = "", bool debug = false, zmq::context_t* context = NULL);
+    explicit SceneReceiver(DataHub::Core* core, QString clientAddress = "", bool debug = false, zmq::context_t* context = NULL);
     ~SceneReceiver();
 
 private:
 	//!
 	//! The list of request the reqester uses to request the packages.
 	//!
-	QList<QString> m_requests;
+	QList<QString> m_packageNames;
     SceneDataHandler *m_sceneData;
+    QString m_clientAddress;
     QByteArray toByteArray(zmq::message_t& message) const
     {
         if (message.size() > 0)

@@ -29,10 +29,11 @@ any part thereof, the company/individual will have to contact Filmakademie
 
 #include "sceneReceiver.h"
 
-SceneReceiver::SceneReceiver(DataHub::Core* core, QString IPAdress, bool debug, zmq::context_t* context) 
-	: ZeroMQHandler(core, IPAdress, debug, false, context)
+SceneReceiver::SceneReceiver(DataHub::Core* core, QString clientAddress, bool debug, zmq::context_t* context)
+	: ZeroMQHandler(core, "0.0.0.0", debug, false, context), m_clientAddress(clientAddress)
 {
-	m_requests = { "header", "nodes", "parameterobjects", "objects", "characters", "textures", "materials" };
+	m_sceneData = new SceneDataHandler();
+	m_packageNames = { "header", "thumbnail" , "nodes", "parameterobjects", "objects", "characters", "textures", "materials"};
 }
 
 SceneReceiver::~SceneReceiver()
@@ -43,60 +44,87 @@ SceneReceiver::~SceneReceiver()
 
 void SceneReceiver::run()
 {
-	zmq::socket_t socket(*m_context, ZMQ_REQ);
-	//socket.setsockopt(ZMQ_SNDTIMEO, 200);
+	zmq::socket_t socket(*m_context, ZMQ_REP);
+	socket.setsockopt(ZMQ_RCVTIMEO, 1000);
 
-	QString address = "tcp://" + m_IPadress + ":5555";
+	//QString address = "tcp://" + m_IPadress + ":5555";
+	QString address = "inproc://TransceiverWorkers";
 	socket.connect(address.toLatin1().data());
-
-	m_sceneData = new SceneDataHandler();
 
 	startInfo(address);
 
-	for (int i = 0; i < m_requests.count(); i++)
+	zmq::multipart_t messages;
+
+	int packageCount = 0;
+	while (true)
 	{
-		if (!socket.send(zmq::message_t(m_requests[i].toStdString())))
-			continue;
+		m_mutex.lock();
+		bool stop = m_stop;
+		m_mutex.unlock();
 
-		qDebug() << "Request: " << m_requests[i];
-
-		zmq::message_t recvMessage;
-		socket.recv(recvMessage);
-
-		qDebug() << m_requests[i] << " " << recvMessage.size();
-
-		if (recvMessage.size() > 0)
+		if (zmq::recv_multipart(socket, std::back_inserter(messages), zmq::recv_flags::none).has_value())
 		{
-			switch (i)
+			QString pkName = QString::fromStdString(messages[0].to_string());
+
+			qInfo() << "Package:" << pkName << "received with" << messages[1].size() << "bytes.";
+
+			switch (m_packageNames.indexOf(pkName))
 			{
 			case 0: // header
-				m_sceneData->headerByteData = toByteArray(recvMessage);
+				m_sceneData->headerByteData = toByteArray(messages[1]);
+				packageCount++;
 				break;
-			case 1: // nodes
-				m_sceneData->nodesByteData = toByteArray(recvMessage);
+			case 1: // header
+				m_sceneData->thumbnailByteData = toByteArray(messages[1]);
+				packageCount++;
 				break;
-			case 2: // parameterobjects
-				m_sceneData->parameterObjectsByteData = toByteArray(recvMessage);
+			case 2: // nodes
+				m_sceneData->nodesByteData = toByteArray(messages[1]);
+				packageCount++;
 				break;
-			case 3: // objects
-				m_sceneData->objectsByteData = toByteArray(recvMessage);
+			case 3: // parameterobjects
+				m_sceneData->parameterObjectsByteData = toByteArray(messages[1]);
+				packageCount++;
 				break;
-			case 4: // characters
-				m_sceneData->characterByteData = toByteArray(recvMessage);
+			case 4: // objects
+				m_sceneData->objectsByteData = toByteArray(messages[1]);
+				packageCount++;
 				break;
-			case 5: // textures
-				m_sceneData->texturesByteData = toByteArray(recvMessage);
+			case 5: // characters
+				m_sceneData->characterByteData = toByteArray(messages[1]);
+				packageCount++;
 				break;
-			case 6: // materials
-				m_sceneData->materialsByteData = toByteArray(recvMessage);
+			case 6: // textures
+				m_sceneData->texturesByteData = toByteArray(messages[1]);
+				packageCount++;
+				break;
+			case 7: // materials
+				m_sceneData->materialsByteData = toByteArray(messages[1]);
+				packageCount++;
+				break;
+			default:
+				qInfo() << "Unknown scene package" << pkName << "received! Package skipped.";
+				socket.send(zmq::message_t("0"));
+				continue;
+			}
+			
+			socket.send(zmq::message_t("1"));
+			messages.clear();
+
+			if (packageCount == m_packageNames.size())
+			{
+				qInfo("Scene complete, write Files to Disk!");
+				m_sceneData->writeToDisk("./", m_clientAddress, QDateTime::currentDateTime().toString("dd-MM-yyyy_hh-mm-ss"));
 				break;
 			}
-		}
-	}
 
-	if (!m_sceneData->isEmpty())
-	{
-		m_sceneData->writeToDisk("./", m_IPadress, QDateTime::currentDateTime().toString("dd-MM-yyyy_hh-mm-ss"));
+		}
+		
+		if (stop) {
+			break;
+		}
+
+		QThread::yieldCurrentThread();
 	}
 
 	m_mutex.lock();
