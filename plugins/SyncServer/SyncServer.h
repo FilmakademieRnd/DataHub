@@ -173,6 +173,7 @@ namespace DataHub {
 		bool m_debug;
 		bool m_webSockets;
 		bool m_lockHistory;
+		bool m_sceneServer;
 		bool m_paramHistory;
 		bool m_isRunning;
 		zmq::context_t *m_context;

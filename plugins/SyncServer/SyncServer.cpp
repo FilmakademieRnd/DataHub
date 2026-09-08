@@ -52,7 +52,7 @@ namespace DataHub {
     QList<int64_t> SyncServer::m_clientsInactive;
 
 
-    SyncServer::SyncServer() : m_ownIP(""), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_context(new zmq::context_t(1)), m_isRunning(false), m_webSockets(false)
+    SyncServer::SyncServer() : m_context(new zmq::context_t(1)), m_ownIP(""), m_isRunning(false), m_debug(false), m_lockHistory(true), m_paramHistory(true), m_webSockets(false), m_sceneServer(true)
     {
         m_brokerHandler = nullptr;
     }
@@ -118,6 +118,11 @@ namespace DataHub {
                     {
                         std::cout << "No lock history." << std::endl;
                         m_lockHistory = false;
+                    }
+                    else if (commands[i] == "-ns")
+                    {
+                        std::cout << "No scene server." << std::endl;
+                        m_sceneServer = false;
                     }
                     else if (commands[i] == "-ownIP" && commands.length() > i+1)
                     {
@@ -196,9 +201,11 @@ namespace DataHub {
             initHandler(messageReceiverWS);
         }
 
-        //[SEIM Deactivated because of SceneServer problems]
-        m_brokerHandler = new SceneBroker(core(), m_ownIP, m_debug, m_context);
-        m_brokerHandler->requestStart();
+        if (m_sceneServer)
+        { 
+            m_brokerHandler = new SceneBroker(core(), m_ownIP, m_debug, m_context);
+            m_brokerHandler->requestStart();
+        }
 
         m_isRunning = true;
     }
@@ -224,6 +231,7 @@ namespace DataHub {
         std::cout << "-ws:      run with Web Sockets" << std::endl;
         std::cout << "-np:      run without parameter history" << std::endl;
         std::cout << "-nl:      run without lock history" << std::endl;
+        std::cout << "-ns:      run without scene server" << std::endl;
     }
 
     void SyncServer::requestScene(byte clientID)

@@ -45,7 +45,7 @@ void CommandHandler::tickTime(int time)
 {
 	// increase local time for controlling client timeouts
 	m_time++;
-	std::cout << "\r" << "Time " << QDateTime::fromSecsSinceEpoch(m_time).toString("mm:ss").toStdString() << " ";
+	std::cout << "\r" << "Time " << QDateTime::fromSecsSinceEpoch(m_time, Qt::UTC).toString("hh:mm:ss").toStdString() << " ";
 
 	checkPingTimeouts();
 }
