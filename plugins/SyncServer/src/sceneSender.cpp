@@ -100,7 +100,7 @@ void SceneSender::run()
 			}
 			else {
 				qInfo() << "Requested package" << request << "not part of the scene!";
-				break;
+				continue;
 			}
 		}
 

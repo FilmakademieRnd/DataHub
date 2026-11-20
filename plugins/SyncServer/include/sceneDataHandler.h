@@ -134,9 +134,9 @@ public:
 		parameterObjectsByteData = readFile(filePath, fileNames[3], entryNbr);
 		objectsByteData = readFile(filePath, fileNames[4], entryNbr);
 		characterByteData = readFile(filePath, fileNames[5], entryNbr);
-		splatByteData = readFile(filePath, fileNames[5], entryNbr);
-		texturesByteData = readFile(filePath, fileNames[6], entryNbr);
-		materialsByteData = readFile(filePath, fileNames[7], entryNbr);
+		splatByteData = readFile(filePath, fileNames[6], entryNbr);
+		texturesByteData = readFile(filePath, fileNames[7], entryNbr);
+		materialsByteData = readFile(filePath, fileNames[8], entryNbr);
 	}
 
 	bool isComplete()
