@@ -33,7 +33,7 @@ SceneReceiver::SceneReceiver(DataHub::Core* core, QString clientAddress, bool de
 	: ZeroMQHandler(core, "0.0.0.0", debug, false, context), m_clientAddress(clientAddress)
 {
 	m_sceneData = new SceneDataHandler();
-	m_packageNames = { "header", "thumbnail" , "nodes", "parameterobjects", "objects", "characters", "textures", "materials"};
+	m_packageNames = { "header", "thumbnail" , "nodes", "parameterobjects", "objects", "characters", "splats" ,"textures", "materials"};
 }
 
 SceneReceiver::~SceneReceiver()
@@ -94,11 +94,15 @@ void SceneReceiver::run()
 				m_sceneData->characterByteData = toByteArray(messages[1]);
 				packageCount++;
 				break;
-			case 6: // textures
+			case 6: // characters
+				m_sceneData->splatByteData = toByteArray(messages[1]);
+				packageCount++;
+				break;
+			case 7: // textures
 				m_sceneData->texturesByteData = toByteArray(messages[1]);
 				packageCount++;
 				break;
-			case 7: // materials
+			case 8: // materials
 				m_sceneData->materialsByteData = toByteArray(messages[1]);
 				packageCount++;
 				break;

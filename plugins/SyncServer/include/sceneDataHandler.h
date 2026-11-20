@@ -43,6 +43,7 @@ public:
 		parameterObjectsByteData.clear();
 		objectsByteData.clear();
 		characterByteData.clear();
+		splatByteData.clear();
 		texturesByteData.clear();
 		materialsByteData.clear();
 	}
@@ -54,6 +55,7 @@ public:
 	QByteArray parameterObjectsByteData;
 	QByteArray objectsByteData;
 	QByteArray characterByteData;
+	QByteArray splatByteData;
 	QByteArray texturesByteData;
 	QByteArray materialsByteData;
 
@@ -64,6 +66,7 @@ private:
 	inline static const QString parameterObjectsString {".parameterObjectsByteData"};
 	inline static const QString objectsString {".objectsByteData"};
 	inline static const QString characterString {".characterByteData"};
+	inline static const QString splatString {".splatByteData"};
 	inline static const QString texturesString {".texturesByteData"};
 	inline static const QString materialsString {".materialsByteData"};
 
@@ -79,6 +82,7 @@ public:
 		returnvalue.append(dir.entryList(QStringList() << "*" + parameterObjectsString, QDir::Files));
 		returnvalue.append(dir.entryList(QStringList() << "*" + objectsString, QDir::Files));
 		returnvalue.append(dir.entryList(QStringList() << "*" + characterString, QDir::Files));
+		returnvalue.append(dir.entryList(QStringList() << "*" + splatString, QDir::Files));
 		returnvalue.append(dir.entryList(QStringList() << "*" + texturesString, QDir::Files));
 		returnvalue.append(dir.entryList(QStringList() << "*" + materialsString, QDir::Files));
 
@@ -113,6 +117,7 @@ public:
 		writeFile(&parameterObjectsByteData, filePath + parameterObjectsString);
 		writeFile(&objectsByteData, filePath + objectsString);
 		writeFile(&characterByteData, filePath + characterString);
+		writeFile(&splatByteData, filePath + splatString);
 		writeFile(&texturesByteData, filePath + texturesString);
 		writeFile(&materialsByteData, filePath + materialsString);
 	}
@@ -129,6 +134,7 @@ public:
 		parameterObjectsByteData = readFile(filePath, fileNames[3], entryNbr);
 		objectsByteData = readFile(filePath, fileNames[4], entryNbr);
 		characterByteData = readFile(filePath, fileNames[5], entryNbr);
+		splatByteData = readFile(filePath, fileNames[5], entryNbr);
 		texturesByteData = readFile(filePath, fileNames[6], entryNbr);
 		materialsByteData = readFile(filePath, fileNames[7], entryNbr);
 	}
@@ -141,6 +147,7 @@ public:
 			parameterObjectsByteData.isEmpty() &&
 			objectsByteData.isEmpty() &&
 			characterByteData.isEmpty() &&
+			splatByteData.isEmpty() &&
 			texturesByteData.isEmpty() &&
 			materialsByteData.isEmpty();
 	}

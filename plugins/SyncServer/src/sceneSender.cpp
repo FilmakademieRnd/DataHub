@@ -51,6 +51,7 @@ bool SceneSender::loadData(int fileListNbr)
 	m_responses.insert("parameterobjects", &m_sceneData.parameterObjectsByteData);
 	m_responses.insert("objects", &m_sceneData.objectsByteData);
 	m_responses.insert("characters", &m_sceneData.characterByteData);
+	m_responses.insert("splats", &m_sceneData.splatByteData);
 	m_responses.insert("textures", &m_sceneData.texturesByteData);
 	m_responses.insert("materials", &m_sceneData.materialsByteData);
 
